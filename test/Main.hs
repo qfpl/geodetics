@@ -93,12 +93,12 @@ tests = [
 
 
 -- | The positions are within 30 cm.
-samePlace :: (Ellipsoid e) => Geodetic e -> Geodetic e -> Bool
+samePlace :: Geodetic -> Geodetic -> Bool
 samePlace p1 p2 = geometricalDistance p1 p2 < 0.3 *~ meter
 
 
 -- | The positions are within 10 m.
-closeEnough :: (Ellipsoid e) => Geodetic e -> Geodetic e -> Bool
+closeEnough :: Geodetic -> Geodetic -> Bool
 closeEnough p1 p2 = geometricalDistance p1 p2 < 10 *~ meter
 
 
@@ -107,7 +107,7 @@ sameAngle :: Angle Double -> Angle Double -> Bool
 sameAngle v1 v2 = abs (properAngle (v1 - v2)) < 0.01 *~ arcsecond
 
 -- | The grid positions are within 1mm
-sameGrid :: (GridClass r e) => GridPoint r -> GridPoint r -> Bool
+sameGrid :: GridClass r => GridPoint r -> GridPoint r -> Bool
 sameGrid p1 p2 = check eastings && check northings && check altitude
    where check f = f p1 - f p2 < 1 *~ milli meter
 
@@ -119,7 +119,7 @@ sameOffset go1 go2 = check deltaNorth && check deltaEast && check deltaAltitude
 
 
 -- | The grid X and Y are both within 1 meter
-closeGrid :: (GridClass r e) => GridPoint r -> GridPoint r -> Bool
+closeGrid :: GridClass r => GridPoint r -> GridPoint r -> Bool
 closeGrid p1 p2 = check eastings && check northings && check altitude
    where check f = f p1 - f p2 < 1 *~ meter
 
@@ -128,24 +128,24 @@ dms :: Int -> Int -> Double -> Dimensionless Double
 dms d m s = fromIntegral d *~ degree + fromIntegral m *~ arcminute + s *~ arcsecond
 
 -- | Round-trip from local to WGS84 and back is identity (approximately)
-prop_WGS84_and_back :: Geodetic LocalEllipsoid -> Bool
+prop_WGS84_and_back :: Geodetic -> Bool
 prop_WGS84_and_back p = samePlace p $ toLocal (ellipsoid p) $ toWGS84 p
 
 
 -- | Sample pairs of points with bearings and distances. 
 -- The Oracle for these values is the @FORWARD@ program from
 --  <http://www.ngs.noaa.gov/TOOLS/Inv_Fwd/Inv_Fwd.html>
-worldLines :: [(String, Geodetic WGS84, Geodetic WGS84, Length Double, Dimensionless Double, Dimensionless Double)]
+worldLines :: [(String, Geodetic, Geodetic, Length Double, Dimensionless Double, Dimensionless Double)]
 worldLines = [
-   ("Ordinary", Geodetic (40*~degree) (30*~degree) _0 WGS84, Geodetic (30*~degree) (50*~degree) _0 WGS84,
+   ("Ordinary", Geodetic (40*~degree) (30*~degree) _0 _WGS84, Geodetic (30*~degree) (50*~degree) _0 _WGS84,
       2128852.999*~meter, 115.19596706*~degree, 126.79044315*~degree),
-   ("Over Pole", Geodetic (60*~degree) (0*~degree) _0 WGS84, Geodetic (60*~degree) (180*~degree) _0 WGS84,
+   ("Over Pole", Geodetic (60*~degree) (0*~degree) _0 _WGS84, Geodetic (60*~degree) (180*~degree) _0 _WGS84,
       6695785.820*~meter, 0*~degree, 180*~degree),
-   ("Equator to Pole", Geodetic (0*~degree) (0*~degree) _0 WGS84, Geodetic (90*~degree) (180*~degree) _0 WGS84,
+   ("Equator to Pole", Geodetic (0*~degree) (0*~degree) _0 _WGS84, Geodetic (90*~degree) (180*~degree) _0 _WGS84,
       10001965.729*~meter, 0*~degree, 180*~degree)]
    
    
-worldLineTests :: (String, Geodetic WGS84, Geodetic WGS84, Length Double, Dimensionless Double, Dimensionless Double) -> Test
+worldLineTests :: (String, Geodetic, Geodetic, Length Double, Dimensionless Double, Dimensionless Double) -> Test
 worldLineTests (str, g1, g2, d, a, b) = testCase str $ HU.assertBool "" $ ok $ groundDistance g1 g2
    where
       ok Nothing = False
@@ -157,23 +157,23 @@ worldLineTests (str, g1, g2, d, a, b) = testCase str $ HU.assertBool "" $ ok $ g
 -- | Sample points for UK tests. The oracle for these values is the script at 
 -- <http://www.movable-type.co.uk/scripts/latlong-convert-coords.html>, which uses
 -- the same Helmert transform as this library. Hence the results should match to within 30 cm.
-ukPoints :: [(String, Geodetic WGS84, Geodetic OSGB36)]
+ukPoints :: [(String, Geodetic, Geodetic)]
 ukPoints = [
-   ("Greenwich",        Geodetic (dms 51 28 40.86) (dms 0 0 (-5.83)) _0 WGS84, 
-                        Geodetic (dms 51 28 39.00) (dms 0 0 0) _0 OSGB36),
-   ("Edinburgh Castle", Geodetic (dms 55 56 56.30) (dms (-3) (-12) (-2.73)) _0 WGS84, 
-                        Geodetic (dms 55 56 56.51) (dms (-3) (-11) (-57.61)) _0 OSGB36),
-   ("Lands End",        Geodetic (dms 50 03 56.68) (dms (-5) (-42) (-51.20)) _0 WGS84,
-                        Geodetic (dms 50 03 54.51) (dms (-5) (-42) (-47.87)) _0 OSGB36),
-   ("Gt. Yarmouth Pier",Geodetic (dms 52 36 29.33) (dms 1 44 27.79) _0 WGS84,
-                        Geodetic (dms 52 36 27.84) (dms 1 44 34.52) _0 OSGB36),
-   ("Stanhope",         Geodetic (dms 54 44 49.08) (dms (-2) 0 (-19.89)) _0 WGS84,
-                        Geodetic (dms 54 44 48.71) (dms (-2) 0 (-14.41)) _0 OSGB36) ]
+   ("Greenwich",        Geodetic (dms 51 28 40.86) (dms 0 0 (-5.83)) _0 _WGS84, 
+                        Geodetic (dms 51 28 39.00) (dms 0 0 0) _0 _OSGB36),
+   ("Edinburgh Castle", Geodetic (dms 55 56 56.30) (dms (-3) (-12) (-2.73)) _0 _WGS84, 
+                        Geodetic (dms 55 56 56.51) (dms (-3) (-11) (-57.61)) _0 _OSGB36),
+   ("Lands End",        Geodetic (dms 50 03 56.68) (dms (-5) (-42) (-51.20)) _0 _WGS84,
+                        Geodetic (dms 50 03 54.51) (dms (-5) (-42) (-47.87)) _0 _OSGB36),
+   ("Gt. Yarmouth Pier",Geodetic (dms 52 36 29.33) (dms 1 44 27.79) _0 _WGS84,
+                        Geodetic (dms 52 36 27.84) (dms 1 44 34.52) _0 _OSGB36),
+   ("Stanhope",         Geodetic (dms 54 44 49.08) (dms (-2) 0 (-19.89)) _0 _WGS84,
+                        Geodetic (dms 54 44 48.71) (dms (-2) 0 (-14.41)) _0 _OSGB36) ]
 
 
 
 -- Convert a named point into a test
-pointTest :: (Ellipsoid e2) => (String, Geodetic WGS84, Geodetic e2) -> Test
+pointTest :: (String, Geodetic, Geodetic) -> Test
 pointTest (testName, wgs84, local) =  testCase testName $ HU.assertBool "" $ samePlace wgs84 (toWGS84 local)
 
 
@@ -196,7 +196,7 @@ prop_offset3 delta = sameOffset delta0
 
 -- | Given a grid point and an offset, applying the offset to the point gives a new point which
 -- is offset from the first point by the argument offset.
-prop_grid1 :: GridPoint (GridTM LocalEllipsoid) -> GridOffset -> Bool
+prop_grid1 :: GridPoint GridTM -> GridOffset -> Bool
 prop_grid1 p d = sameOffset d $ p `gridOffset` applyOffset d p
 
 
@@ -208,7 +208,7 @@ prop_ukGrid1 (GridRef str) =
 
 -- | UK Grid Reference points. The oracle for these points was the 
 -- UK Grid Reference Finder (gridreferencefinder.com), retrieved on 26 Jan 2013.
-ukSampleGrid :: [(String, GridPoint UkNationalGrid, Geodetic WGS84, String)]
+ukSampleGrid :: [(String, GridPoint UkNationalGrid, Geodetic, String)]
 ukSampleGrid = map convert [
  -- Grid Reference, X,      Y,      Latitude,  Longitude,    Description
    ("SW3425625070", 134256, 025070, 50.066230, -5.7148278,   "Lands End"),
@@ -223,9 +223,9 @@ ukSampleGrid = map convert [
    where
       convert (grid, x, y, lat, long, desc) = 
          (grid, GridPoint (x *~ meter) (y *~ meter) (0 *~ meter) UkNationalGrid,
-          Geodetic (lat *~ degree) (long *~ degree) (0 *~ meter) WGS84, desc)
+          Geodetic (lat *~ degree) (long *~ degree) (0 *~ meter) _WGS84, desc)
 
-type GridPointTest = (String, GridPoint UkNationalGrid, Geodetic WGS84, String) -> Test
+type GridPointTest = (String, GridPoint UkNationalGrid, Geodetic, String) -> Test
 
 -- | Check that grid reference to grid point works for sample points.
 ukGridTest2 :: GridPointTest
@@ -245,12 +245,12 @@ ukGridTest4 (_, gp, geo, testName) = testCase testName $ HU.assertBool ""
 -- | Check that WGS84 to grid point works close enough for sample points.
 ukGridTest5 :: GridPointTest
 ukGridTest5 (_, gp, geo, testName) = testCase testName $ HU.assertBool ""
-   $ offsetDistance (gridOffset gp $ toGrid UkNationalGrid $ toLocal OSGB36 geo) < 1 *~ meter
+   $ offsetDistance (gridOffset gp $ toGrid UkNationalGrid $ toLocal _OSGB36 geo) < 1 *~ meter
 
 
 -- | Worked example for UK Geodetic to GridPoint, taken from "A Guide to Coordinate Systems in Great Britain" [1]
-ukTest :: Geodetic OSGB36
-ukTest = Geodetic (dms 52 39 27.2531) (dms 1 43 4.5177) (0 *~ meter) OSGB36
+ukTest :: Geodetic
+ukTest = Geodetic (dms 52 39 27.2531) (dms 1 43 4.5177) (0 *~ meter) _OSGB36
 
 {- 
    v = 6.3885023333E+06
@@ -270,10 +270,10 @@ ukTest = Geodetic (dms 52 39 27.2531) (dms 1 43 4.5177) (0 *~ meter) OSGB36
 
 
 -- | Standard stereographic grid for point tests in the Northern Hemisphere.
-stereoGridN :: GridStereo LocalEllipsoid
+stereoGridN :: GridStereo
 stereoGridN = mkGridStereo tangent origin (0.9999079 *~ one)
    where
-      ellipse = LocalEllipsoid "Bessel 1841" (6377397.155 *~ metre) (299.15281 *~ one) mempty
+      ellipse = Ellipsoid (6377397.155 *~ metre) (299.15281 *~ one) mempty
       tangent = Geodetic (dms 52 9 22.178) (dms 5 23 15.500) (0 *~ meter) ellipse
       origin = GridOffset (155000 *~ metre) (463000 *~ metre) (0 *~ meter)
       
@@ -281,10 +281,10 @@ stereoGridN = mkGridStereo tangent origin (0.9999079 *~ one)
 -- | Standard steregraphic grid for point tests in the Southern Hemisphere.
 -- 
 -- This is the same as stereoGridN but with the tangent latitude and the false origin northings negated. 
-stereoGridS :: GridStereo LocalEllipsoid
+stereoGridS :: GridStereo
 stereoGridS = mkGridStereo tangent origin (0.9999079 *~ one)
    where
-      ellipse = LocalEllipsoid "Bessel 1841" (6377397.155 *~ metre) (299.15281 *~ one) mempty
+      ellipse = Ellipsoid (6377397.155 *~ metre) (299.15281 *~ one) mempty
       tangent = Geodetic (negate $ dms 52 9 22.178) (dms 5 23 15.500) (0 *~ meter) ellipse
       origin = GridOffset ((-155000) *~ metre) (463000 *~ metre) (0 *~ meter)
 
@@ -323,7 +323,7 @@ stereographicFromGridS = samePlace p1 p1'
 
 
 -- | Check the round trip for a stereographic projection.
-prop_stereographic :: GridPoint (GridStereo LocalEllipsoid) -> Property
+prop_stereographic :: GridPoint GridStereo -> Property
 prop_stereographic p =
    let g = fromGrid p
        r = toGrid (gridBasis p) g
@@ -333,21 +333,21 @@ prop_stereographic p =
 
 
 -- | A ray at distance zero returns its original arguments.
-prop_rayPath1 :: Ray WGS84 -> Bool
+prop_rayPath1 :: Ray -> Bool
 prop_rayPath1 r@(Ray pt b e) = 
       samePlace pt pt1 && sameAngle b b1 && sameAngle e e1
    where (pt1,b1,e1) = pathFunc (getRay r) _0
 
 
-type ContinuityTest e = Geodetic e -> Bearing -> Azimuth -> Distance -> Distance -> Property
+type ContinuityTest = Geodetic -> Bearing -> Azimuth -> Distance -> Distance -> Property
 
-type ContinuityTest1 e = Geodetic e -> Bearing -> Distance2 -> Distance2 -> Property
+type ContinuityTest1 = Geodetic -> Bearing -> Distance2 -> Distance2 -> Property
 
 -- | Many paths can be specified by a start point, bearing and azimuth,
 -- and have the property that any (point,bearing,azimuth) triple on 
 -- the path will specify the same path with a distance offset.
-prop_pathContinuity :: (Ellipsoid e) =>
-   (Geodetic e -> Angle Double -> Angle Double -> Path e) -> ContinuityTest e
+prop_pathContinuity ::
+   (Geodetic -> Angle Double -> Angle Double -> Path) -> ContinuityTest
 prop_pathContinuity pf pt0 (Bearing b0) (Azimuth a0) (Distance d1) (Distance d2) =
    counterexample (show ((pt2, Bearing b2, Azimuth a2), (pt3, Bearing b3, Azimuth a3))) $
       pathValidAt path0 d1 && pathValidAt path0 d2 && pathValidAt path0 (d1+d2) ==>
@@ -362,7 +362,7 @@ prop_pathContinuity pf pt0 (Bearing b0) (Azimuth a0) (Distance d1) (Distance d2)
 
 -- | For continuity testing of ground-based paths (azimuth & altitude always zero) 
 -- where lower accuracy is required.
-prop_pathContinuity1 :: (Ellipsoid e) => (Geodetic e -> Angle Double -> Path e) -> ContinuityTest1 e
+prop_pathContinuity1 :: (Geodetic -> Angle Double -> Path) -> ContinuityTest1
 prop_pathContinuity1 pf pt0 (Bearing b0) (Distance2 d1) (Distance2 d2) =
    counterexample (show ((pt2, Bearing b2), (pt3, Bearing b3))) $
       pathValidAt path0 d1 && pathValidAt path0 d2 && pathValidAt path0 (d1+d2) ==>
@@ -376,13 +376,13 @@ prop_pathContinuity1 pf pt0 (Bearing b0) (Distance2 d1) (Distance2 d2) =
 
 
 -- | A point on a ray will continue along the same ray, and hence give the same points.
-prop_rayContinuity :: ContinuityTest WGS84
+prop_rayContinuity :: ContinuityTest
 prop_rayContinuity = prop_pathContinuity rayPath 
 
 
 -- | A ray bisected to an altitude will give that altitude.
 -- This is a test of bisection rather than rays.
-prop_rayBisect :: Ray WGS84 -> Altitude -> Bool
+prop_rayBisect :: Ray -> Altitude -> Bool
 prop_rayBisect r (Altitude height) = 
    case bisect ray0 f (1 *~ centi meter) (0 *~ meter) (1000 *~ kilo meter) of
       Nothing -> False
@@ -393,7 +393,7 @@ prop_rayBisect r (Altitude height) =
    
 
 -- | A point on a rhumb line will continue along the same rhumb.
-prop_rhumbContinuity :: ContinuityTest1 WGS84
+prop_rhumbContinuity :: ContinuityTest1
 prop_rhumbContinuity = prop_pathContinuity1 rhumbPath
 
 

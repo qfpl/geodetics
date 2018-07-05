@@ -139,29 +139,29 @@ instance Arbitrary Helmert where
          shrinkUnit (helmertScale h) <*>
          shrinkUnit (rX h) <*> shrinkUnit (rY h) <*> shrinkUnit (rZ h)      
 
-
+{-
 instance Arbitrary WGS84 where
    arbitrary = return WGS84
    shrink = shrinkNothing
-   
+  -} 
 
-instance Arbitrary LocalEllipsoid where
+instance Arbitrary Ellipsoid where
    arbitrary =
-      LocalEllipsoid <$> (("Local_" ++) <$> replicateM 3 (choose ('A','Z'))) <*>  -- name
+      Ellipsoid <$>
          ((*~ meter) <$> choose (6378100, 6378400)) <*>                  -- majorRadius
          ((*~ one) <$> choose (297,300)) <*>                             -- flatR
          arbitrary                                                       -- helmert
-   shrink e = tail $ LocalEllipsoid (nameLocal e) (majorRadius e) (flatR e) <$> shrink' (helmert e)
+   shrink e = tail $ Ellipsoid (majorRadius e) (flatR e) <$> shrink' (helmert e)
 
         
-instance (Ellipsoid e, Arbitrary e) => Arbitrary (Geodetic e) where
+instance Arbitrary Geodetic where
    arbitrary = 
       Geodetic <$> genLatitude <*> genLongitude <*> genOffset 1 <*> arbitrary
    shrink g = 
       tail $ Geodetic <$> shrinkAngle (latitude g) <*> shrinkAngle (longitude g) <*> 
          shrinkLength (altitude g) <*> shrink' (ellipsoid g)
 
-instance (Ellipsoid e, Arbitrary e) => Arbitrary (GridPoint (GridTM e)) where
+instance Arbitrary (GridPoint GridTM) where
    arbitrary = GridPoint <$> genOffset 100000 <*> genOffset 100000 <*> genOffset 1 <*> arbitrary
    shrink p = tail $ GridPoint <$> 
       shrinkLength (eastings p) <*> 
@@ -170,7 +170,7 @@ instance (Ellipsoid e, Arbitrary e) => Arbitrary (GridPoint (GridTM e)) where
       shrink' (gridBasis p)
 
 
-instance (Ellipsoid e, Arbitrary e) => Arbitrary (GridPoint (GridStereo e)) where
+instance Arbitrary (GridPoint GridStereo) where
    arbitrary = GridPoint <$> genOffset 100000 <*> genOffset 100000 <*> genOffset 1 <*> arbitrary
    shrink p = tail $ GridPoint <$> 
       shrinkLength (eastings p) <*> 
@@ -179,7 +179,7 @@ instance (Ellipsoid e, Arbitrary e) => Arbitrary (GridPoint (GridStereo e)) wher
       shrink' (gridBasis p)
 
 
-instance (Ellipsoid e, Arbitrary e) => Arbitrary (GridTM e) where
+instance Arbitrary GridTM where
    arbitrary = mkGridTM <$> arbitrary <*> arbitrary <*> ((*~ one) <$> choose (0.95,1.0))
    shrink tm = tail $ mkGridTM <$> shrink' (trueOrigin tm) <*> shrink' (falseOrigin tm) <*> [TM.gridScale tm]
    
@@ -190,21 +190,21 @@ instance Arbitrary GridOffset where
       shrinkLength (deltaEast d) <*> shrinkLength (deltaNorth d) <*> shrinkLength (deltaAltitude d)
 
 
-instance (Ellipsoid e, Arbitrary e) => Arbitrary (GridStereo e) where
+instance Arbitrary GridStereo where
    arbitrary = mkGridStereo <$> arbitrary <*> arbitrary <*> ((*~ one) <$> choose (0.95,1.0))
    shrink sg = tail $ mkGridStereo <$> shrink' (gridTangent sg) <*> shrink' (gridOrigin sg) <*> [SG.gridScale sg]
    
 
 -- | Wrapper for arbitrary rays, along with creation parameters for printing and shrinking.
-data Ray e = Ray (Geodetic e) (Angle Double) (Angle Double)
+data Ray = Ray Geodetic (Angle Double) (Angle Double)
 
-instance (Ellipsoid e) => Show (Ray e) where
+instance Show Ray where
    show (Ray p0 b e ) = "(Ray " ++ show p0 ++ ", " ++ showAngle b ++ ", " ++ showAngle e ++ ")"
 
-getRay :: (Ellipsoid e) => Ray e -> Path e
+getRay :: Ray -> Path
 getRay (Ray p0 b e) = rayPath p0 b e
 
-instance (Ellipsoid e, Arbitrary e) => Arbitrary (Ray e) where
+instance Arbitrary Ray where
    arbitrary = do
       p0 <- arbitrary
       b <- (*~ degree) <$> choose (-180,180)
@@ -219,7 +219,7 @@ instance (Ellipsoid e, Arbitrary e) => Arbitrary (Ray e) where
      
 -- | Two rhumb paths starting not more than 1000 km apart.
 data RhumbPaths2 = RP2 {
-      rp2Point0 :: Geodetic WGS84,
+      rp2Point0 :: Geodetic,
       rp2Bearing0 :: Bearing,
       rp2Distance :: Distance2,
       rp2Bearing1 :: Bearing,
@@ -245,7 +245,7 @@ instance Arbitrary RhumbPaths2 where
          shrink' (rp2Bearing1 rp) <*> 
          shrink' (rp2Bearing2 rp)
 
-mk2RhumbPaths :: RhumbPaths2 -> (Path WGS84, Path WGS84)
+mk2RhumbPaths :: RhumbPaths2 -> (Path, Path)
 mk2RhumbPaths (RP2 pt0 (Bearing b0) (Distance2 d) (Bearing b1) (Bearing b2)) =
    (path1, path2)
    where
