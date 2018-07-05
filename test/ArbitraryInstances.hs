@@ -139,12 +139,6 @@ instance Arbitrary Helmert where
          shrinkUnit (helmertScale h) <*>
          shrinkUnit (rX h) <*> shrinkUnit (rY h) <*> shrinkUnit (rZ h)      
 
-{-
-instance Arbitrary WGS84 where
-   arbitrary = return WGS84
-   shrink = shrinkNothing
-  -} 
-
 instance Arbitrary Ellipsoid where
    arbitrary =
       Ellipsoid <$>
