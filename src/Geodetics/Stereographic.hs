@@ -19,8 +19,8 @@ import Prelude ()
 
 
 -- | A stereographic projection with its origin at an arbitrary point on Earth, other than the poles.
-data GridStereo e = GridStereo {
-      gridTangent :: Geodetic e, -- ^ Point where the plane of projection touches the ellipsoid. Often known as the Natural Origin.
+data GridStereo = GridStereo {
+      gridTangent :: Geodetic, -- ^ Point where the plane of projection touches the ellipsoid. Often known as the Natural Origin.
       gridOrigin :: GridOffset,  -- ^ Grid position of the tangent point. Often known as the False Origin.
       gridScale :: Dimensionless Double, -- ^ Scaling factor that balances the distortion between the center and the edges. 
                                          -- Should be slightly less than unity.
@@ -33,7 +33,7 @@ data GridStereo e = GridStereo {
    } deriving (Show)
    
 -- | Create a stereographic projection. The tangency point must not be one of the poles.  
-mkGridStereo :: (Ellipsoid e) => Geodetic e -> GridOffset -> Dimensionless Double -> GridStereo e
+mkGridStereo :: Geodetic -> GridOffset -> Dimensionless Double -> GridStereo
 mkGridStereo tangent origin scale = GridStereo {
       gridTangent = tangent,
       gridOrigin = origin,
@@ -71,7 +71,7 @@ mkGridStereo tangent origin scale = GridStereo {
       latC1 = asin sinLatC1
       
 
-instance (Ellipsoid e) => GridClass (GridStereo e) e where
+instance GridClass GridStereo where
    toGrid grid geo = applyOffset (gridOrigin grid) $ GridPoint east north (geoAlt geo) grid
       where
          op :: Num a => Quantity d a -> Quantity d a    -- Values of longitude, tangent longitude, E and N

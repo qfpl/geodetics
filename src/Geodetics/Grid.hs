@@ -1,5 +1,3 @@
-{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies #-}
-
 module Geodetics.Grid (
    -- ** Grid types
    GridClass (..),
@@ -27,6 +25,7 @@ import Data.Monoid (Monoid)
 import Data.Semigroup (Semigroup, (<>))
 import Geodetics.Altitude
 import Geodetics.Geodetic
+import Geodetics.Ellipsoids
 import Numeric.Units.Dimensional.Prelude hiding ((.))
 import qualified Prelude as P
 
@@ -36,10 +35,10 @@ import qualified Prelude as P
 -- Hence conversion from a geodetic to a grid point requires the \"basis\" for the grid in question,
 -- and grid points carry that basis with them because without it there is no defined relationship
 -- between the grid points and terrestrial positions.
-class GridClass r e | r->e where
-   fromGrid :: GridPoint r -> Geodetic e
-   toGrid :: r -> Geodetic e -> GridPoint r
-   gridEllipsoid :: r -> e
+class GridClass r where
+   fromGrid :: GridPoint r -> Geodetic
+   toGrid :: r -> Geodetic -> GridPoint r
+   gridEllipsoid :: r -> Ellipsoid
 
 
 -- | A point on the specified grid. 

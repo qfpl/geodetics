@@ -15,7 +15,7 @@ module Geodetics.Geodetic (
    geoToEarth,
    earthToGeo,
    -- ** Re-exported for convenience
-   WGS84 (..)
+   _WGS84
 ) where
 
 
@@ -59,13 +59,13 @@ import qualified Prelude as P
 -- physical location.  If you want to find out if two co-ordinates are
 -- the same to within a given tolerance then use "geometricDistance"
 -- (or its squared variant to avoid an extra @sqrt@ operation).
-data (Ellipsoid e) => Geodetic e = Geodetic {
+data Geodetic = Geodetic {
    latitude, longitude :: Angle Double,
    geoAlt :: Length Double,
-   ellipsoid :: e
+   ellipsoid :: Ellipsoid
 }
 
-instance (Ellipsoid e) => Show (Geodetic e) where
+instance Show Geodetic where
    show g = concat [
       showAngle (abs $ latitude g),  " ", letter "SN" (latitude g),  ", ",
       showAngle (abs $ longitude g), " ", letter "WE" (longitude g), ", ", 
@@ -90,7 +90,7 @@ instance (Ellipsoid e) => Show (Geodetic e) where
 -- * Degrees, minutes and seconds (units optional): 34° 31' 23.52\" N, 46° 13' 56.43\" W 
 -- 
 -- * DDDMMSS format with optional leading zeros: 343123.52N, 0461356.43W
-readGroundPosition :: (Ellipsoid e) => e -> String -> Maybe (Geodetic e)
+readGroundPosition :: Ellipsoid -> String -> Maybe Geodetic
 readGroundPosition e str = 
    case map fst $ filter (null . snd) $ readP_to_S latLong str of
       [] -> Nothing
@@ -116,7 +116,7 @@ showAngle a
       dstr = reverse $ take 2 $ reverse (show ds) ++ "00" -- Decimal fraction with zero padding.
          
 
-instance (Ellipsoid e) => HasAltitude (Geodetic e) where
+instance HasAltitude Geodetic where
    altitude = geoAlt
    setAltitude h g = g{geoAlt = h}
 
@@ -124,7 +124,7 @@ instance (Ellipsoid e) => HasAltitude (Geodetic e) where
    
 -- | The point on the Earth diametrically opposite the argument, with
 -- the same altitude.
-antipode :: (Ellipsoid e) => Geodetic e -> Geodetic e
+antipode :: Geodetic -> Geodetic
 antipode g = Geodetic lat long (geoAlt g) (ellipsoid g)
    where
       lat = negate $ latitude g
@@ -136,7 +136,7 @@ antipode g = Geodetic lat long (geoAlt g) (ellipsoid g)
    
 -- | Convert a geodetic coordinate into earth centered, relative to the
 -- ellipsoid in use.
-geoToEarth :: (Ellipsoid e) => Geodetic e -> ECEF
+geoToEarth :: Geodetic -> ECEF
 geoToEarth geo = (
       (n + h) * coslat * coslong,
       (n + h) * coslat * sinlong,
@@ -157,7 +157,7 @@ geoToEarth geo = (
 -- Uses the closed form solution of H. Vermeille: Direct
 -- transformation from geocentric coordinates to geodetic coordinates.
 -- Journal of Geodesy Volume 76, Number 8 (2002), 451-454
-earthToGeo :: (Ellipsoid e) => e -> ECEF -> (Angle Double, Angle Double, Length Double)
+earthToGeo :: Ellipsoid -> ECEF -> (Angle Double, Angle Double, Length Double)
 earthToGeo e (x,y,z) = (phi, atan2 y x, sqrt (l ^ pos2 + p2) - norm)
    where
       -- Naming: numeric suffix inicates power. Hence x2 = x * x, x3 = x2 * x, etc.
@@ -182,7 +182,7 @@ earthToGeo e (x,y,z) = (phi, atan2 y x, sqrt (l ^ pos2 + p2) - norm)
 
 
 -- | Convert a position from any geodetic to another one, assuming local altitude stays constant.
-toLocal :: (Ellipsoid e1, Ellipsoid e2) => e2 -> Geodetic e1 -> Geodetic e2
+toLocal :: Ellipsoid -> Geodetic -> Geodetic
 toLocal e2 g = Geodetic lat lon alt e2
    where
       alt = altitude g
@@ -191,11 +191,11 @@ toLocal e2 g = Geodetic lat lon alt e2
 
 -- | Convert a position from any geodetic to WGS84, assuming local
 -- altitude stays constant.
-toWGS84 :: (Ellipsoid e) => Geodetic e -> Geodetic WGS84
-toWGS84 g = Geodetic lat lon alt WGS84
+toWGS84 :: Geodetic -> Geodetic
+toWGS84 g = Geodetic lat lon alt _WGS84
    where
       alt = altitude g
-      (lat, lon, _) = earthToGeo WGS84 $ applyHelmert h $ geoToEarth g
+      (lat, lon, _) = earthToGeo _WGS84 $ applyHelmert h $ geoToEarth g
       h = helmert (ellipsoid g)
 
 
@@ -203,11 +203,11 @@ toWGS84 g = Geodetic lat lon alt WGS84
 -- points. They must be on the same ellipsoid.
 -- Note that this is not the geodetic distance taken by following 
 -- the curvature of the earth.
-geometricalDistance :: (Ellipsoid e) => Geodetic e -> Geodetic e -> Length Double
+geometricalDistance :: Geodetic -> Geodetic -> Length Double
 geometricalDistance g1 g2 = sqrt $ geometricalDistanceSq g1 g2
 
 -- | The square of the absolute distance. Comes out as "Area" type of course.
-geometricalDistanceSq :: (Ellipsoid e) => Geodetic e -> Geodetic e -> Area Double
+geometricalDistanceSq :: Geodetic -> Geodetic -> Area Double
 geometricalDistanceSq g1 g2 = (x1-x2) ^ pos2 + (y1-y2) ^ pos2 + (z1-z2) ^ pos2
    where
       (x1,y1,z1) = geoToEarth g1
@@ -228,7 +228,7 @@ geometricalDistanceSq g1 g2 = (x1-x2) ^ pos2 + (y1-y2) ^ pos2 + (z1-z2) ^ pos2
 -- geodesics on the ellipsoid with application of nested
 -- equations\". T. Vincenty. Survey Review XXII 176, April
 -- 1975. <http://www.ngs.noaa.gov/PUBS_LIB/inverse.pdf>
-groundDistance :: (Ellipsoid e) => Geodetic e -> Geodetic e ->
+groundDistance :: Geodetic -> Geodetic ->
                   Maybe (Length Double, Dimensionless Double, Dimensionless Double)
 groundDistance p1 p2 = do
      (_, (lambda, (cos2Alpha, delta, sinDelta, cosDelta, cos2DeltaM))) <-

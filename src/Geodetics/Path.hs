@@ -23,8 +23,8 @@ type PathValidity = (Length Double, Length Double)
 -- such as a spheroid instead of an ellipsoid, provided that this is documented. 
 -- Outside its validity the path function may
 -- return anything or bottom.
-data Path e = Path {
-      pathFunc :: Length Double -> (Geodetic e, Angle Double, Angle Double),
+data Path = Path {
+      pathFunc :: Length Double -> (Geodetic, Angle Double, Angle Double),
       pathValidity :: PathValidity
    }
    
@@ -35,7 +35,7 @@ alwaysValid = (negate inf, inf) where
 
 
 -- | True if the path is valid at that distance.
-pathValidAt :: Path e -> Length Double -> Bool
+pathValidAt :: Path -> Length Double -> Bool
 pathValidAt path d = d > x1 && d < x2
    where (x1,x2) = pathValidity path
 
@@ -48,8 +48,8 @@ pathValidAt path d = d > x1 && d < x2
 -- The initial bounds must return one GT or EQ value and one LT or EQ value. If they
 -- do not then @Nothing@ is returned.
 bisect :: 
-   Path e 
-   -> (Geodetic e -> Ordering)        -- ^ Evaluation function.
+   Path 
+   -> (Geodetic -> Ordering)        -- ^ Evaluation function.
    -> Length Double                   -- ^ Required accuracy in terms of distance along the path.
    -> Length Double -> Length Double  -- ^ Initial bounds.
    -> Maybe (Length Double)
@@ -84,11 +84,11 @@ bisect path f t b1 b2 = do
 -- intersection as the next estimates.
 --
 -- If either estimate departs from its path validity then @Nothing@ is returned.
-intersect :: (Ellipsoid e) =>
+intersect ::
    Length Double -> Length Double     -- ^ Starting estimates.
    -> Length Double                   -- ^ Required accuracy.
    -> Int                             -- ^ Iteration limit. Returns @Nothing@ if this is reached.  
-   -> Path e -> Path e                -- ^ Paths to intersect.
+   -> Path -> Path                    -- ^ Paths to intersect.
    -> Maybe (Length Double, Length Double)
 intersect d1 d2 accuracy n path1 path2
    | not $ pathValidAt path1 d1     = Nothing
@@ -168,11 +168,11 @@ is taken as the basis for the next approximation.
 -}
 
 -- | A ray from a point heading in a straight line in 3 dimensions. 
-rayPath :: (Ellipsoid e) => 
-   Geodetic e          -- ^ Start point.
+rayPath ::
+   Geodetic            -- ^ Start point.
    -> Angle Double     -- ^ Bearing.
    -> Angle Double     -- ^ Elevation.
-   -> Path e
+   -> Path
 rayPath pt1 bearing elevation = Path ray alwaysValid
    where
       ray distance = (Geodetic lat long alt (ellipsoid pt1), bearing2, elevation2)
@@ -213,10 +213,10 @@ rayPath pt1 bearing elevation = Path ray alwaysValid
 -- Based on *Practical Sailing Formulas for Rhumb-Line Tracks on an Oblate Earth* 
 -- by G.H. Kaplan, U.S. Naval Observatory. Except for points close to the poles 
 -- the approximation is accurate to within a few meters over 1000km.
-rhumbPath :: (Ellipsoid e) =>
-   Geodetic e            -- ^ Start point.
+rhumbPath ::
+   Geodetic              -- ^ Start point.
    -> Angle Double       -- ^ Course.
-   -> Path e
+   -> Path
 rhumbPath pt course = Path rhumb validity
    where
       rhumb distance = (Geodetic lat (properAngle lon) _0 (ellipsoid pt), course, _0)
@@ -250,9 +250,9 @@ rhumbPath pt course = Path rhumb validity
 -- | A path following the line of latitude around the Earth eastwards.
 --
 -- This is equivalent to @rhumbPath pt (pi/2)@
-latitudePath :: (Ellipsoid e) =>
-   Geodetic e           -- ^ Start point.
-   -> Path e
+latitudePath ::
+   Geodetic             -- ^ Start point.
+   -> Path
 latitudePath pt = Path line alwaysValid
    where
       line distance = (pt2, pi/_2, _0) 
@@ -267,7 +267,7 @@ latitudePath pt = Path line alwaysValid
 -- for the southward path.
 --
 -- This is equivalent to @rhumbPath pt _0@
-longitudePath :: (Ellipsoid e) =>
-   Geodetic e    -- ^ Start point.
-   -> Path e
+longitudePath ::
+   Geodetic      -- ^ Start point.
+   -> Path
 longitudePath pt = rhumbPath pt _0

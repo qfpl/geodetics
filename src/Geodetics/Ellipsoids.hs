@@ -14,8 +14,9 @@ module Geodetics.Ellipsoids (
    applyHelmert,
    -- ** Ellipsoid models of the Geoid
    Ellipsoid (..),
-   WGS84 (..),
-   LocalEllipsoid (..),
+   helmertFromWSG84,
+   helmertToWSG84,
+   _WGS84,
    flattening,
    minorRadius,
    eccentricity2,
@@ -153,19 +154,32 @@ applyHelmert h (x,y,z) = (
 -- 
 -- > helmertToWGS84 = applyHelmert . helmert
 -- > helmertFromWGS84 e . helmertToWGS84 e = id
-class (Show a, Eq a) => Ellipsoid a where
-   majorRadius :: a -> Length Double
-   flatR :: a -> Dimensionless Double
-      -- ^ Inverse of the flattening.
-   helmert :: a -> Helmert
-   helmertToWSG84 :: a -> ECEF -> ECEF
-      -- ^ The Helmert transform that will convert a position wrt 
-      -- this ellipsoid into a position wrt WGS84.
-   helmertToWSG84 e = applyHelmert (helmert e)
-   helmertFromWSG84 :: a -> ECEF -> ECEF
-      -- ^ And its inverse.
-   helmertFromWSG84 e = applyHelmert (inverseHelmert $ helmert e)
+data Ellipsoid =
+   Ellipsoid {
+      majorRadius ::
+         Length Double
+   ,  flatR ::
+         Dimensionless Double
+   ,  helmert ::
+         Helmert
+   }
+   deriving (Eq, Show)
 
+_WGS84 ::
+  Ellipsoid
+_WGS84 =
+   Ellipsoid
+      (6378137.0 *~ meter)
+      (298.257223563 *~ one)
+      mempty
+
+helmertToWSG84 :: Ellipsoid -> ECEF -> ECEF
+   -- ^ The Helmert transform that will convert a position wrt 
+   -- this ellipsoid into a position wrt WGS84.
+helmertToWSG84 e = applyHelmert (helmert e)
+helmertFromWSG84 :: Ellipsoid -> ECEF -> ECEF
+   -- ^ And its inverse.
+helmertFromWSG84 e = applyHelmert (inverseHelmert $ helmert e)
 
 -- | The WGS84 geoid, major radius 6378137.0 meters, flattening = 1 / 298.257223563
 -- as defined in \"Technical Manual DMA TM 8358.1 - Datums, Ellipsoids, Grids, and 
@@ -173,82 +187,49 @@ class (Show a, Eq a) => Ellipsoid a where
 -- 
 -- The WGS84 has a special place in this library as the standard Ellipsoid against
 -- which all others are defined.
-data WGS84 = WGS84
 
-instance Eq WGS84 where _ == _ = True
-
-instance Show WGS84 where
-   show _ = "WGS84"
    
-instance Ellipsoid WGS84 where
-   majorRadius _ = 6378137.0 *~ meter
-   flatR _ = 298.257223563 *~ one
-   helmert _ = mempty
-   helmertToWSG84 _ = id
-   helmertFromWSG84 _ = id
-   
-   
--- | Ellipsoids other than WGS84, used within a defined geographical area where
--- they are a better fit to the local geoid. Can also be used for historical ellipsoids.
---
--- The @Show@ instance just returns the name.
--- Creating two different local ellipsoids with the same name is a Bad Thing.
-data LocalEllipsoid = LocalEllipsoid {
-   nameLocal :: String,
-   majorRadiusLocal :: Length Double,
-   flatRLocal :: Dimensionless Double,
-   helmertLocal :: Helmert } deriving (Eq)
-
-instance Show LocalEllipsoid where
-    show = nameLocal  
-
-instance Ellipsoid LocalEllipsoid where
-   majorRadius = majorRadiusLocal
-   flatR = flatRLocal
-   helmert = helmertLocal
-
-
 -- | Flattening (f) of an ellipsoid.
-flattening :: (Ellipsoid e) => e -> Dimensionless Double
+flattening :: Ellipsoid -> Dimensionless Double
 flattening e = _1 / flatR e
 
 -- | The minor radius of an ellipsoid.
-minorRadius :: (Ellipsoid e) => e -> Length Double
+minorRadius :: Ellipsoid -> Length Double
 minorRadius e = majorRadius e * (_1 - flattening e)
 
 
 -- | The eccentricity squared of an ellipsoid.
-eccentricity2 :: (Ellipsoid e) => e -> Dimensionless Double
+eccentricity2 :: Ellipsoid -> Dimensionless Double
 eccentricity2 e = _2 * f - (f * f) where f = flattening e
 
 -- | The second eccentricity squared of an ellipsoid.
-eccentricity'2 :: (Ellipsoid e) => e -> Dimensionless Double
+eccentricity'2 :: Ellipsoid -> Dimensionless Double
 eccentricity'2 e = (f * (_2 - f)) / (_1 - f * f) where f = flattening e
 
 
 -- | Distance from the surface at the specified latitude to the 
 -- axis of the Earth straight down. Also known as the radius of 
 -- curvature in the prime vertical, and often denoted @N@.
-normal :: (Ellipsoid e) => e -> Angle Double -> Length Double
+normal :: Ellipsoid -> Angle Double -> Length Double
 normal e lat = majorRadius e / sqrt (_1 - eccentricity2 e * sin lat ^ pos2)
 
 
 -- | Radius of the circle of latitude: the distance from a point 
 -- at that latitude to the axis of the Earth.
-latitudeRadius :: (Ellipsoid e) => e -> Angle Double -> Length Double
+latitudeRadius :: Ellipsoid -> Angle Double -> Length Double
 latitudeRadius e lat = normal e lat * cos lat
 
 
 -- | Radius of curvature in the meridian at the specified latitude. 
 -- Often denoted @M@.
-meridianRadius :: (Ellipsoid e) => e -> Angle Double -> Length Double
+meridianRadius :: Ellipsoid -> Angle Double -> Length Double
 meridianRadius e lat = 
    majorRadius e * (_1 - eccentricity2 e) 
    / sqrt ((_1 - eccentricity2 e * sin lat ^ pos2) ^ pos3)
    
 
 -- | Radius of curvature of the ellipsoid perpendicular to the meridian at the specified latitude.
-primeVerticalRadius :: (Ellipsoid e) => e -> Angle Double -> Length Double
+primeVerticalRadius :: Ellipsoid -> Angle Double -> Length Double
 primeVerticalRadius e lat =
    majorRadius e / sqrt (_1 - eccentricity2 e * sin lat ^ pos2)
 
@@ -259,7 +240,7 @@ primeVerticalRadius e lat =
 -- Mercator projection. The name "isometric" arises from the fact that at any point 
 -- on the ellipsoid equal increments of ψ and longitude λ give rise to equal distance 
 -- displacements along the meridians and parallels respectively.
-isometricLatitude :: (Ellipsoid e) => e -> Angle Double -> Angle Double
+isometricLatitude :: Ellipsoid -> Angle Double -> Angle Double
 isometricLatitude ellipse lat = atanh sinLat - e * atanh (e * sinLat)
    where
       sinLat = sin lat

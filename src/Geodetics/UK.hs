@@ -2,7 +2,7 @@
 
 -- | Distinguished coordinate systems for the United Kingdom.
 module Geodetics.UK (
-   OSGB36 (..),
+   _OSGB36,
    UkNationalGrid (..),
    ukGrid,
    fromUkGridReference,
@@ -31,35 +31,35 @@ import qualified Prelude as P
 -- can be in error by as much as 5 meters and should not be used in applications
 -- requiring greater accuracy.  A more precise conversion requires a large table 
 -- of corrections for historical inaccuracies in the triangulation of the UK.
-data OSGB36 = OSGB36 deriving (Eq, Show)
-
-instance Ellipsoid OSGB36 where
-   majorRadius _ = 6377563.396 *~ meter
-   flatR _ = 299.3249646 *~ one
-   helmert _ = Helmert {
+_OSGB36 ::
+  Ellipsoid
+_OSGB36 =
+   Ellipsoid
+     (6377563.396 *~ meter)
+     (299.3249646 *~ one)
+     (Helmert {
       cX = 446.448 *~ meter, cY = (-125.157) *~ meter, cZ = 542.06 *~ meter,
       helmertScale = (-20.4894) *~ one,
-      rX = 0.1502 *~ arcsecond, rY = 0.247 *~ arcsecond, rZ = 0.8421 *~ arcsecond }
-
+      rX = 0.1502 *~ arcsecond, rY = 0.247 *~ arcsecond, rZ = 0.8421 *~ arcsecond })
 
 -- | The UK National Grid is a Transverse Mercator projection with a true origin at
 -- 49 degrees North, 2 degrees West on OSGB36, and a false origin 400km West and 100 km North of
 -- the true origin. The scale factor is defined as @10**(0.9998268 - 1)@.
 data UkNationalGrid = UkNationalGrid deriving (Eq, Show)
 
-instance GridClass UkNationalGrid OSGB36 where
+instance GridClass UkNationalGrid where
    toGrid _ = unsafeGridCoerce UkNationalGrid . toGrid ukGrid
    fromGrid = fromGrid . unsafeGridCoerce ukGrid
-   gridEllipsoid _ = OSGB36
+   gridEllipsoid _ = _OSGB36
 
 
 
-ukTrueOrigin :: Geodetic OSGB36
+ukTrueOrigin :: Geodetic
 ukTrueOrigin = Geodetic {
    latitude = 49 *~ degree,
    longitude = (-2) *~ degree,
    geoAlt = 0 *~ meter,
-   ellipsoid = OSGB36
+   ellipsoid = _OSGB36
 }
 
 ukFalseOrigin :: GridOffset 
@@ -67,7 +67,7 @@ ukFalseOrigin = GridOffset ((-400) *~ kilo meter) (100 *~ kilo meter) (0 *~ mete
 
 
 -- | Numerical definition of the UK national grid.
-ukGrid :: GridTM OSGB36
+ukGrid :: GridTM
 ukGrid = mkGridTM ukTrueOrigin ukFalseOrigin 
    ((10 *~ one) ** (0.9998268 *~ one - _1))
 

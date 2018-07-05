@@ -16,8 +16,8 @@ import Prelude ()
 -- | A Transverse Mercator projection gives an approximate mapping of the ellipsoid on to a 2-D grid. It models
 -- a sheet curved around the ellipsoid so that it touches it at one north-south line (hence making it part of
 -- a slightly elliptical cylinder).
-data GridTM e = GridTM {
-   trueOrigin :: Geodetic e,
+data GridTM = GridTM {
+   trueOrigin :: Geodetic,
       -- ^ A point on the line where the projection touches the ellipsoid (altitude is ignored).
    falseOrigin :: GridOffset,
       -- ^ The grid position of the true origin. Used to avoid negative coordinates over 
@@ -32,11 +32,11 @@ data GridTM e = GridTM {
 
 
 -- | Create a Transverse Mercator grid.
-mkGridTM :: (Ellipsoid e) => 
-   Geodetic e               -- ^ True origin.
+mkGridTM :: 
+   Geodetic                 -- ^ True origin.
    -> GridOffset            -- ^ Vector from true origin to false origin.
    -> Dimensionless Double  -- ^ Scale factor.
-   -> GridTM e
+   -> GridTM
 mkGridTM origin offset sf =
    GridTM {trueOrigin = origin,
            falseOrigin = offset,
@@ -54,7 +54,7 @@ mkGridTM origin offset sf =
 
 
 -- | Equation C3 from reference [1].
-m :: (Ellipsoid e) => GridTM e -> Dimensionless Double -> Length Double
+m :: GridTM -> Dimensionless Double -> Length Double
 m grid lat = bF0 * (gridN1 grid * dLat 
                     - gridN2 grid * sin dLat * cos sLat
                     + gridN3 grid * sin (_2 * dLat) * cos (_2 * sLat) 
@@ -65,7 +65,7 @@ m grid lat = bF0 * (gridN1 grid * dLat
       bF0 = minorRadius (gridEllipsoid grid) * gridScale grid
 
 
-instance (Ellipsoid e) => GridClass (GridTM e) e where
+instance GridClass GridTM where
    fromGrid p = Geodetic
       (lat' - east' ^ pos2 * tanLat / (_2 * rho * v)  -- Term VII
             + east' ^ pos4 * (tanLat / ((24 *~ one) * rho * v ^ pos3)) 
