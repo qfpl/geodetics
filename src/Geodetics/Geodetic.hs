@@ -26,6 +26,7 @@ import Data.Monoid
 import Geodetics.Altitude
 import Geodetics.Ellipsoids
 import Geodetics.LatLongParser
+import Linear.V3(V3(V3))
 import Numeric.Units.Dimensional.Prelude hiding ((.))
 import Text.ParserCombinators.ReadP
 import qualified Prelude as P
@@ -137,10 +138,10 @@ antipode g = Geodetic lat long (geoAlt g) (ellipsoid g)
 -- | Convert a geodetic coordinate into earth centered, relative to the
 -- ellipsoid in use.
 geoToEarth :: Geodetic -> ECEF
-geoToEarth geo = (
-      (n + h) * coslat * coslong,
-      (n + h) * coslat * sinlong,
-      (n * (_1 - eccentricity2 e) + h) * sinlat)
+geoToEarth geo = V3 (
+      (n + h) * coslat * coslong)
+      ((n + h) * coslat * sinlong)
+      ((n * (_1 - eccentricity2 e) + h) * sinlat)
    where 
       n = normal e $ latitude geo
       e = ellipsoid geo
@@ -158,7 +159,7 @@ geoToEarth geo = (
 -- transformation from geocentric coordinates to geodetic coordinates.
 -- Journal of Geodesy Volume 76, Number 8 (2002), 451-454
 earthToGeo :: Ellipsoid -> ECEF -> (Angle Double, Angle Double, Length Double)
-earthToGeo e (x,y,z) = (phi, atan2 y x, sqrt (l ^ pos2 + p2) - norm)
+earthToGeo e (V3 x y z) = (phi, atan2 y x, sqrt (l ^ pos2 + p2) - norm)
    where
       -- Naming: numeric suffix inicates power. Hence x2 = x * x, x3 = x2 * x, etc.
       p2 = x ^ pos2 + y ^ pos2
@@ -210,8 +211,8 @@ geometricalDistance g1 g2 = sqrt $ geometricalDistanceSq g1 g2
 geometricalDistanceSq :: Geodetic -> Geodetic -> Area Double
 geometricalDistanceSq g1 g2 = (x1-x2) ^ pos2 + (y1-y2) ^ pos2 + (z1-z2) ^ pos2
    where
-      (x1,y1,z1) = geoToEarth g1
-      (x2,y2,z2) = geoToEarth g2
+      (V3 x1 y1 z1) = geoToEarth g1
+      (V3 x2 y2 z2) = geoToEarth g2
 
 
 -- | The shortest ellipsoidal distance between two points on the

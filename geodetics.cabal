@@ -36,7 +36,8 @@ library
   build-depends:   
                    base >= 4.8 && < 5,
                    dimensional >= 1 && < 1.2,
-                   array >= 0.4 && < 0.6
+                   array >= 0.4 && < 0.6,
+                   linear >= 1.20 && < 1.21
   if !impl(ghc>=8.0)
     build-depends: semigroups >= 0.9 && < 0.19
   ghc-options:     -Wall

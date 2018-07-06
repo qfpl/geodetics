@@ -28,7 +28,7 @@ module Geodetics.Ellipsoids (
    primeVerticalRadius,
    isometricLatitude,
    -- ** Tiny linear algebra library for 3D vectors
-   Vec3,
+   V3,
    Matrix3,
    add3,
    scale3,
@@ -42,68 +42,66 @@ module Geodetics.Ellipsoids (
 
 import Data.Monoid (Monoid)
 import Data.Semigroup (Semigroup, (<>))
+import Linear.V3(V3(V3))
 import Numeric.Units.Dimensional
 import Numeric.Units.Dimensional.Prelude
 import Prelude ()  -- Numeric instances.
 
 
--- | 3d vector as @(X,Y,Z)@.
-type Vec3 a = (a,a,a)
-
--- | 3x3 transform matrix for Vec3.
-type Matrix3 a = Vec3 (Vec3 a)
-
+-- | 3x3 transform matrix for V3.
+type Matrix3 a = V3 (V3 a)
 
 -- | Multiply a vector by a scalar.
 scale3 :: (Num a) =>
-   Vec3 (Quantity d a) -> Quantity d' a -> Vec3 (Quantity (d * d') a)
-scale3 (x,y,z) s = (x*s, y*s, z*s)
+   V3 (Quantity d a) -> Quantity d' a -> V3 (Quantity (d * d') a)
+scale3 (V3 x y z) s = V3 (x*s) (y*s) (z*s)
 
 
 -- | Negation of a vector.
-negate3 :: (Num a) => Vec3 (Quantity d a) -> Vec3 (Quantity d a)
-negate3 (x,y,z) = (negate x, negate y, negate z)
+negate3 :: (Num a) => V3 (Quantity d a) -> V3 (Quantity d a)
+negate3 (V3 x y z) = V3 (negate x) (negate y) (negate z)
 
 -- | Add two vectors
-add3 :: (Num a) => Vec3 (Quantity d a) -> Vec3 (Quantity d a) -> Vec3 (Quantity d a)
-add3 (x1,y1,z1) (x2,y2,z2) = (x1+x2, y1+y2, z1+z2)
+add3 :: (Num a) => V3 (Quantity d a) -> V3 (Quantity d a) -> V3 (Quantity d a)
+add3 (V3 x1 y1 z1) (V3 x2 y2 z2) = V3 (x1+x2) (y1+y2) (z1+z2)
 
 
 -- | Multiply a matrix by a vector in the Dimensional type system.
 transform3 :: (Num a) =>
-   Matrix3 (Quantity d a) -> Vec3 (Quantity d' a) -> Vec3 (Quantity (d*d') a)
-transform3 (tx,ty,tz) v = (t tx v, t ty v, t tz v)
+   Matrix3 (Quantity d a) -> V3 (Quantity d' a) -> V3 (Quantity (d*d') a)
+transform3 (V3 tx ty tz) v = V3 (t tx v) (t ty v) (t tz v)
    where
-      t (x1,y1,z1) (x2,y2,z2) = x1*x2 + y1*y2 + z1*z2
+      t (V3 x1 y1 z1) (V3 x2 y2 z2) = x1*x2 + y1*y2 + z1*z2
 
 
 -- | Inverse of a 3x3 matrix.
 invert3 :: (Fractional a) =>
    Matrix3 (Quantity d a) -> Matrix3 (Quantity ((d*d)/(d*d*d)) a)
-invert3 ((x1,y1,z1),
-         (x2,y2,z2),
-         (x3,y3,z3)) =
-      ((det2 y2 z2 y3 z3 / det, det2 z1 y1 z3 y3 / det, det2 y1 z1 y2 z2 / det),
-       (det2 z2 x2 z3 x3 / det, det2 x1 z1 x3 z3 / det, det2 z1 x1 z2 x2 / det),
-       (det2 x2 y2 x3 y3 / det, det2 y1 x1 y3 x3 / det, det2 x1 y1 x2 y2 / det))
+invert3 (V3 (V3 x1 y1 z1)
+            (V3 x2 y2 z2)
+            (V3 x3 y3 z3)) =
+      V3
+         (V3 (det2 y2 z2 y3 z3 / det) (det2 z1 y1 z3 y3 / det) (det2 y1 z1 y2 z2 / det))
+         (V3 (det2 z2 x2 z3 x3 / det) (det2 x1 z1 x3 z3 / det) (det2 z1 x1 z2 x2 / det))
+         (V3 (det2 x2 y2 x3 y3 / det) (det2 y1 x1 y3 x3 / det) (det2 x1 y1 x2 y2 / det))
    where
       det = (x1*y2*z3 + y1*z2*x3 + z1*x2*y3) - (z1*y2*x3 + y1*x2*z3 + x1*z2*y3)
       det2 a b c d = a*d - b*c
 
 -- | Transpose of a 3x3 matrix.
 trans3 :: Matrix3 a -> Matrix3 a
-trans3 ((x1,y1,z1),(x2,y2,z2),(x3,y3,z3)) = ((x1,x2,x3),(y1,y2,y3),(z1,z2,z3))
+trans3 (V3 (V3 x1 y1 z1) (V3 x2 y2 z2) (V3 x3 y3 z3)) = V3 (V3 x1 x2 x3) (V3 y1 y2 y3) (V3 z1 z2 z3)
 
 
 -- | Dot product of two vectors
 dot3 :: (Num a) =>
-   Vec3 (Quantity d1 a) -> Vec3 (Quantity d2 a) -> Quantity (d1 * d2) a
-dot3 (x1,y1,z1) (x2,y2,z2) = x1*x2 + y1*y2 + z1*z2
+   V3 (Quantity d1 a) -> V3 (Quantity d2 a) -> Quantity (d1 * d2) a
+dot3 (V3 x1 y1 z1) (V3 x2 y2 z2) = x1*x2 + y1*y2 + z1*z2
 
 -- | Cross product of two vectors
 cross3 :: (Num a) =>
-   Vec3 (Quantity d1 a) -> Vec3 (Quantity d2 a) -> Vec3 (Quantity (d1 * d2) a)
-cross3 (x1,y1,z1) (x2,y2,z2) = (y1*z2 - z1*y2, z1*x2 - x1*z2, x1*y2 - y1*x2)
+   V3 (Quantity d1 a) -> V3 (Quantity d2 a) -> V3 (Quantity (d1 * d2) a)
+cross3 (V3 x1 y1 z1) (V3 x2 y2 z2) = V3 (y1*z2 - z1*y2) (z1*x2 - x1*z2) (x1*y2 - y1*x2)
 
 
 -- | The 7 parameter Helmert transformation. The monoid instance allows composition.
@@ -130,14 +128,14 @@ inverseHelmert h = Helmert (negate $ cX h) (negate $ cY h) (negate $ cZ h)
 
 -- | Earth-centred, Earth-fixed coordinates as a vector. The origin and axes are
 -- not defined: use with caution.
-type ECEF = Vec3 (Length Double)
+type ECEF = V3 (Length Double)
 
 -- | Apply a Helmert transformation to earth-centered coordinates.
 applyHelmert:: Helmert -> ECEF -> ECEF
-applyHelmert h (x,y,z) = (
-      cX h + s * (                x - rZ h * y + rY h * z),
-      cY h + s * (        rZ h  * x +        y - rX h * z),
-      cZ h + s * (negate (rY h) * x + rX h * y +        z))
+applyHelmert h (V3 x y z) = V3 (
+      cX h + s * (                x - rZ h * y + rY h * z))
+      (cY h + s * (        rZ h  * x +        y - rX h * z))
+      (cZ h + s * (negate (rY h) * x + rX h * y +        z))
    where
       s = _1 + helmertScale h * (1e-6 *~ one)
 

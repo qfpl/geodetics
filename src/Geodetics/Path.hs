@@ -6,6 +6,7 @@ module Geodetics.Path where
 import Control.Monad
 import Geodetics.Ellipsoids
 import Geodetics.Geodetic
+import Linear.V3(V3(V3))
 import Numeric.Units.Dimensional.Prelude
 import Prelude ()
 
@@ -105,14 +106,14 @@ intersect d1 d2 accuracy n path1 path2
       (pt1, h1, _) = pathFunc path1 d1
       (pt2, h2, _) = pathFunc path2 d2
       vectors :: Angle Double -> Angle Double -> Angle Double 
-                 -> (Vec3 (Dimensionless Double), Vec3 (Dimensionless Double))
+                 -> (V3 (Dimensionless Double), V3 (Dimensionless Double))
       vectors lat lon b = (
           -- Unit vector of normal to surface at (lat,lon)
-         (cosLat*cosLon, cosLat*sinLon, sinLat),
+         V3 (cosLat*cosLon) (cosLat*sinLon) sinLat,
          -- Normal of great circle defined by bearing b at (lat,lon)
-         (sinLon * cosB - sinLat * cosLon * sinB,
-          negate cosLon * cosB - sinLat * sinLon * sinB,
-           cosLat * sinB))
+         V3 (sinLon * cosB - sinLat * cosLon * sinB)
+          (negate cosLon * cosB - sinLat * sinLon * sinB)
+           (cosLat * sinB))
          where
             sinLon = sin lon
             sinLat = sin lat
@@ -120,7 +121,7 @@ intersect d1 d2 accuracy n path1 path2
             cosLat = cos lat
             sinB = sin b
             cosB = cos b
-      mag3 (x,y,z) = sqrt $ x*x + y*y + z*z
+      mag3 (V3 x y z) = sqrt $ x*x + y*y + z*z
       (nv1, gc1) = vectors (latitude pt1) (longitude pt1) h1
       (nv2, gc2) = vectors (latitude pt2) (longitude pt2) h2
       nv3 = gc1 `cross3` gc2         -- Intersection of the great circles
@@ -178,25 +179,26 @@ rayPath pt1 bearing elevation = Path ray alwaysValid
       ray distance = (Geodetic lat long alt (ellipsoid pt1), bearing2, elevation2)
          where
             pt2' = pt1' `add3` (delta `scale3` distance)      -- ECEF of result point.
-            (lat,long,alt) = earthToGeo (ellipsoid pt1) pt2'  -- Geodetic of result point.
-            (dE,dN,dU) = transform3 (trans3 $ ecefMatrix lat long) delta  -- Direction of ray at result point.
+            (lat, long, alt) = earthToGeo (ellipsoid pt1) pt2'  -- Geodetic of result point.
+            (V3 dE dN dU) = transform3 (trans3 $ ecefMatrix lat long) delta  -- Direction of ray at result point.
             elevation2 = asin dU
             bearing2 = if dE == _0 && dN == _0 then bearing else atan2 dE dN  -- Allow for vertical elevation.
             
       ecefMatrix lat long =   -- Transform matrix for vectors from (East, North, Up) to (X,Y,Z).
-         ((negate sinLong, negate cosLong*sinLat, cosLong*cosLat),
-              --    East X      North X               Up X
-          (       cosLong, negate sinLong*sinLat, sinLong*cosLat),
-              --    East Y      North Y               Up Y
-          (  _0           ,      cosLat         , sinLat))
-              --    East Z      North Z               Up Z
+         V3
+             (V3 (negate sinLong) (negate cosLong*sinLat) (cosLong*cosLat))
+                 --    East X      North X               Up X
+             (V3 (       cosLong) (negate sinLong*sinLat) (sinLong*cosLat))
+                 --    East Y      North Y               Up Y
+             (V3    _0                  cosLat           sinLat)
+                 --    East Z      North Z               Up Z
          where
             sinLong = sin long
             cosLong = cos long
             sinLat = sin lat
             cosLat = cos lat
       
-      direction = (sinB*cosE, cosB*cosE, sinE)  -- Direction of ray in ENU
+      direction = V3 (sinB*cosE) (cosB*cosE) sinE  -- Direction of ray in ENU
       delta = transform3 (ecefMatrix (latitude pt1) (longitude pt1)) direction  -- Convert to ECEF
       pt1' = geoToEarth pt1    -- ECEF of origin point.
       sinB = sin bearing
