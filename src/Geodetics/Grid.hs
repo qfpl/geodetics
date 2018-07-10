@@ -3,6 +3,7 @@ module Geodetics.Grid (
    GridClass (..),
    GridPoint (..),
    GridOffset (..),
+   HasGridOffset (..),
    -- ** Grid operations
    polarOffset,
    offsetScale,
@@ -19,7 +20,7 @@ module Geodetics.Grid (
    toGridDigits
 ) where
 
-import Control.Lens((^.))
+import Control.Lens(Lens', (^.))
 import Data.Char
 import Data.Function
 import Data.Monoid (Monoid)
@@ -69,6 +70,38 @@ instance HasAltitude (GridPoint g) where
 data GridOffset = GridOffset {
    deltaEast, deltaNorth, deltaAltitude :: Length Double
 } deriving (Eq, Show)
+
+class HasGridOffset a where
+   gridOffsetL ::
+     Lens' a GridOffset
+   deltaEastL ::
+     Lens' a (Length Double)
+   {-# INLINE deltaEastL #-}
+   deltaNorthL ::
+     Lens' a (Length Double)
+   {-# INLINE deltaNorthL #-}
+   deltaAltitudeL ::
+     Lens' a (Length Double)
+   {-# INLINE deltaAltitudeL #-}
+   deltaEastL =
+      gridOffsetL . deltaEastL
+   deltaNorthL =
+      gridOffsetL . deltaNorthL
+   deltaAltitudeL =
+      gridOffsetL . deltaAltitudeL
+
+instance HasGridOffset GridOffset where
+   {-# INLINE deltaEastL #-}
+   {-# INLINE deltaNorthL #-}
+   {-# INLINE deltaAltitudeL #-}
+   gridOffsetL =
+      P.id
+   deltaEastL k (GridOffset e n a) =
+      fmap (\x -> GridOffset x n a) (k e)
+   deltaNorthL k (GridOffset e n a) =
+      fmap (\x -> GridOffset e x a) (k n)
+   deltaAltitudeL k (GridOffset e n a) =
+      fmap (\x -> GridOffset e n x) (k a)
 
 instance Semigroup GridOffset where
   g1 <> g2 = GridOffset (deltaEast g1 + deltaEast g2)

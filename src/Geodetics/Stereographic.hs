@@ -7,10 +7,11 @@ OGP Surveying and Positioning Guidance Note number 7, part 2 – August 2006
 {-# LANGUAGE MultiParamTypeClasses, FlexibleInstances #-}
 module Geodetics.Stereographic (
    GridStereo (gridTangent, gridOrigin, gridScale),
+   HasGridStereo(..),
    mkGridStereo
 ) where
 
-import Control.Lens((^.))
+import Control.Lens(Lens', (^.))
 import Geodetics.Altitude
 import Geodetics.Ellipsoids
 import Geodetics.Geodetic
@@ -34,7 +35,111 @@ data GridStereo = GridStereo {
       gridLatC :: Angle Double,
       gridG, gridH :: Length Double
    } deriving (Show)
-   
+
+class HasGridStereo a where
+   gridStereo ::
+     Lens' a GridStereo
+   gridScaleL :: 
+     Lens' a (Dimensionless Double)
+   gridRL ::
+     Lens' a (Length Double)
+   gridNL :: 
+     Lens' a (Dimensionless Double)
+   gridCL :: 
+     Lens' a (Dimensionless Double)
+   gridSinL :: 
+     Lens' a (Dimensionless Double)
+   gridCosL :: 
+     Lens' a (Dimensionless Double)
+   gridLatCL :: 
+     Lens' a (Angle Double)
+   gridGL :: 
+     Lens' a (Length Double)
+   gridHL :: 
+     Lens' a (Length Double)
+   gridScaleL =
+      gridStereo . gridScaleL
+   {-# INLINE gridScaleL #-}
+   gridRL =
+      gridStereo . gridRL
+   {-# INLINE gridRL #-}
+   gridNL =
+      gridStereo . gridNL
+   {-# INLINE gridNL #-}
+   gridCL =
+      gridStereo . gridCL
+   {-# INLINE gridCL #-}
+   gridSinL =
+      gridStereo . gridSinL
+   {-# INLINE gridSinL #-}
+   gridCosL =
+      gridStereo . gridCosL
+   {-# INLINE gridCosL #-}
+   gridLatCL =
+      gridStereo . gridLatCL
+   {-# INLINE gridLatCL #-}
+   gridGL =
+      gridStereo . gridGL
+   {-# INLINE gridGL #-}
+   gridHL =
+      gridStereo . gridHL
+   {-# INLINE gridHL #-}
+
+instance HasGridStereo GridStereo where
+   gridStereo =
+      id
+   gridScaleL k (GridStereo t o s r dn dc dsin dcos c g h) =
+      fmap (\x -> GridStereo t o x r dn dc dsin dcos c g h) (k s)
+   {-# INLINE gridScaleL #-}
+   gridRL k (GridStereo t o s r dn dc dsin dcos c g h) =
+      fmap (\x -> GridStereo t o s x dn dc dsin dcos c g h) (k r)
+   {-# INLINE gridRL #-}
+   gridNL k (GridStereo t o s r dn dc dsin dcos c g h) =
+      fmap (\x -> GridStereo t o s r x dc dsin dcos c g h) (k dn)
+   {-# INLINE gridNL #-}
+   gridCL k (GridStereo t o s r dn dc dsin dcos c g h) =
+      fmap (\x -> GridStereo t o s r dn x dsin dcos c g h) (k dc)
+   {-# INLINE gridCL #-}
+   gridSinL k (GridStereo t o s r dn dc dsin dcos c g h) =
+      fmap (\x -> GridStereo t o s r dn dc x dcos c g h) (k dsin)
+   {-# INLINE gridSinL #-}
+   gridCosL k (GridStereo t o s r dn dc dsin dcos c g h) =
+      fmap (\x -> GridStereo t o s r dn dc dsin x c g h) (k dcos)
+   {-# INLINE gridCosL #-}
+   gridLatCL k (GridStereo t o s r dn dc dsin dcos c g h) =
+      fmap (\x -> GridStereo t o s r dn dc dsin dcos x g h) (k c)
+   {-# INLINE gridLatCL #-}
+   gridGL k (GridStereo t o s r dn dc dsin dcos c g h) =
+      fmap (\x -> GridStereo t o s r dn dc dsin dcos c x h) (k g)
+   {-# INLINE gridGL #-}
+   gridHL k (GridStereo t o s r dn dc dsin dcos c g h) =
+      fmap (\x -> GridStereo t o s r dn dc dsin dcos c g x) (k h)
+   {-# INLINE gridHL #-}
+
+instance HasGeodetic GridStereo where
+   geodetic k (GridStereo t o s r dn dc dsin dcos c g h) =
+      fmap (\x -> GridStereo x o s r dn dc dsin dcos c g h) (k t)
+
+instance HasAltitude GridStereo where
+   altitude =
+      geodetic . altitude
+
+instance HasLatitude GridStereo where
+   latitudeL =
+      geodetic . latitudeL
+
+instance HasLongitude GridStereo where
+   longitudeL =
+      geodetic . longitudeL
+
+instance HasEllipsoid GridStereo where
+   ellipsoid =
+      geodetic . ellipsoid
+
+instance HasGridOffset GridStereo where
+   gridOffsetL k (GridStereo t o s r dn dc dsin dcos c g h) =
+      fmap (\x -> GridStereo t x s r dn dc dsin dcos c g h) (k o)
+
 -- | Create a stereographic projection. The tangency point must not be one of the poles.  
 mkGridStereo :: Geodetic -> GridOffset -> Dimensionless Double -> GridStereo
 mkGridStereo tangent origin scale = GridStereo {
