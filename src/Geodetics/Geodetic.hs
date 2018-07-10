@@ -121,9 +121,9 @@ instance Show Geodetic where
 -- * DDDMMSS format with optional leading zeros: 343123.52N, 0461356.43W
 readGroundPosition :: Ellipsoid -> String -> Maybe Geodetic
 readGroundPosition e str = 
-   case map fst $ filter (null . snd) $ readP_to_S latLong str of
+   case map fst . filter (null . snd) $ readP_to_S latLong str of
       [] -> Nothing
-      (lat,long) : _ -> Just $ groundPosition $ Geodetic (lat *~ degree) (long *~ degree) undefined e
+      (lat,long) : _ -> Just . groundPosition $ Geodetic (lat *~ degree) (long *~ degree) undefined e
       
       
 -- | Show an angle as degrees, minutes and seconds to two decimal places.
@@ -146,11 +146,11 @@ showAngle a
          
 -- | The point on the Earth diametrically opposite the argument, with
 -- the same altitude.
-antipode :: Geodetic -> Geodetic
-antipode g = Geodetic lat long (g ^. altitude) (g ^. ellipsoid)
+antipode :: HasGeodetic g => g -> Geodetic
+antipode g = Geodetic lat long (g ^. geodetic . altitude) (g ^. geodetic . ellipsoid)
    where
-      lat = negate $ (g ^. latitudeL)
-      long' = (g ^. longitudeL) - 180 *~ degree
+      lat = negate $ (g ^. geodetic . latitudeL)
+      long' = (g ^. geodetic . longitudeL) - 180 *~ degree
       long | long' < _0  = long' + 360 *~ degree
            | otherwise  = long' 
 
@@ -158,21 +158,21 @@ antipode g = Geodetic lat long (g ^. altitude) (g ^. ellipsoid)
    
 -- | Convert a geodetic coordinate into earth centered, relative to the
 -- ellipsoid in use.
-geoToEarth :: Geodetic -> ECEF
+geoToEarth :: HasGeodetic l => l -> ECEF
 geoToEarth geo = V3 (
       (n + h) * coslat * coslong)
       ((n + h) * coslat * sinlong)
       ((n * (_1 - eccentricity2 e) + h) * sinlat)
    where 
-      geolat = geo ^. latitudeL
-      geolon = geo ^. longitudeL
+      geolat = geo ^. geodetic . latitudeL
+      geolon = geo ^. geodetic . longitudeL
       n = normal e $ geolat
-      e = geo ^. ellipsoid
-      coslat = cos $ geolat
-      coslong = cos $ geolon
-      sinlat = sin $ geolat
-      sinlong = sin $ geolon
-      h = geo ^. altitude
+      e = geo ^. geodetic . ellipsoid
+      coslat = cos geolat
+      coslong = cos geolon
+      sinlat = sin geolat
+      sinlong = sin geolon
+      h = geo ^. geodetic . altitude
 
 
 -- | Convert an earth centred coordinate into a geodetic coordinate on 
@@ -181,10 +181,10 @@ geoToEarth geo = V3 (
 -- Uses the closed form solution of H. Vermeille: Direct
 -- transformation from geocentric coordinates to geodetic coordinates.
 -- Journal of Geodesy Volume 76, Number 8 (2002), 451-454
-earthToGeo :: Ellipsoid -> ECEF -> (Angle Double, Angle Double, Length Double)
+earthToGeo :: HasEllipsoid e => e -> ECEF -> (Angle Double, Angle Double, Length Double)
 earthToGeo e (V3 x y z) = (phi, atan2 y x, sqrt (l ^ pos2 + p2) - norm)
    where
-      -- Naming: numeric suffix inicates power. Hence x2 = x * x, x3 = x2 * x, etc.
+      -- Naming: numeric suffix indicates power. Hence x2 = x * x, x3 = x2 * x, etc.
       p2 = x ^ pos2 + y ^ pos2
       a = majorRadius e
       a2 = a ^ pos2

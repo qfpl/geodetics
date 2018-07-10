@@ -173,16 +173,17 @@ is taken as the basis for the next approximation.
 
 -- | A ray from a point heading in a straight line in 3 dimensions. 
 rayPath ::
-   Geodetic            -- ^ Start point.
+   HasGeodetic g =>
+   g            -- ^ Start point.
    -> Angle Double     -- ^ Bearing.
    -> Angle Double     -- ^ Elevation.
    -> Path
 rayPath pt1 bearing elevation = Path ray alwaysValid
    where
-      ray distance = (Geodetic lat long alt (pt1 ^. ellipsoid), bearing2, elevation2)
+      ray distance = (Geodetic lat long alt (pt1 ^. geodetic . ellipsoid), bearing2, elevation2)
          where
             pt2' = pt1' `add3` (delta `scale3` distance)      -- ECEF of result point.
-            (lat, long, alt) = earthToGeo (pt1 ^. ellipsoid) pt2'  -- Geodetic of result point.
+            (lat, long, alt) = earthToGeo (pt1 ^. geodetic . ellipsoid) pt2'  -- Geodetic of result point.
             (V3 dE dN dU) = transform3 (trans3 $ ecefMatrix lat long) delta  -- Direction of ray at result point.
             elevation2 = asin dU
             bearing2 = if dE == _0 && dN == _0 then bearing else atan2 dE dN  -- Allow for vertical elevation.
@@ -202,7 +203,7 @@ rayPath pt1 bearing elevation = Path ray alwaysValid
             cosLat = cos lat
       
       direction = V3 (sinB*cosE) (cosB*cosE) sinE  -- Direction of ray in ENU
-      delta = transform3 (ecefMatrix (pt1 ^. latitudeL) (pt1 ^. longitudeL)) direction  -- Convert to ECEF
+      delta = transform3 (ecefMatrix (pt1 ^. geodetic . latitudeL) (pt1 ^. geodetic . longitudeL)) direction  -- Convert to ECEF
       pt1' = geoToEarth pt1    -- ECEF of origin point.
       sinB = sin bearing
       cosB = cos bearing
@@ -219,12 +220,13 @@ rayPath pt1 bearing elevation = Path ray alwaysValid
 -- by G.H. Kaplan, U.S. Naval Observatory. Except for points close to the poles 
 -- the approximation is accurate to within a few meters over 1000km.
 rhumbPath ::
-   Geodetic              -- ^ Start point.
+  HasGeodetic g =>
+   g              -- ^ Start point.
    -> Angle Double       -- ^ Course.
    -> Path
 rhumbPath pt course = Path rhumb validity
    where
-      rhumb distance = (Geodetic lat (properAngle lon) _0 (pt ^. ellipsoid), course, _0)
+      rhumb distance = (Geodetic lat (properAngle lon) _0 (pt ^. geodetic . ellipsoid), course, _0)
          where
             lat' = lat0 + distance * cosC / m0   -- Kaplan Eq 13.
             lat = lat0 + (m0 / (a*(_1-e2))) * ((_1-_3*e2/_4)*(lat'-lat0)
@@ -232,10 +234,10 @@ rhumbPath pt course = Path rhumb validity
             lon | abs cosC > 1e-7 *~ one 
                      = lon0 + tanC * (q lat - q0)     -- Kaplan Eq 16.
                 | otherwise
-                     = lon0 + distance * sinC / latitudeRadius (pt ^. ellipsoid) ((lat0 + lat')/_2)
+                     = lon0 + distance * sinC / latitudeRadius (pt ^. geodetic . ellipsoid) ((lat0 + lat')/_2)
       validity
-         | cosC > _0  = ((negate pi/_2 - (pt ^. latitudeL)) * b / cosC, (pi/_2 - (pt ^. latitudeL)) * b / cosC)
-         | otherwise  = ((pi/_2 - (pt ^. latitudeL)) * b / cosC, (negate pi/_2 - (pt ^. latitudeL)) * b / cosC)
+         | cosC > _0  = ((negate pi/_2 - (pt ^. geodetic . latitudeL)) * b / cosC, (pi/_2 - (pt ^. geodetic . latitudeL)) * b / cosC)
+         | otherwise  = ((pi/_2 - (pt ^. geodetic . latitudeL)) * b / cosC, (negate pi/_2 - (pt ^. geodetic . latitudeL)) * b / cosC)
       q0 = q lat0
       q phi = log (tan (pi/_4+phi/_2)) + e * log ((_1-eSinPhi)/(_1+eSinPhi)) / _2
          where                                -- Factor out expression from Eq 16 of Kaplan
@@ -243,9 +245,9 @@ rhumbPath pt course = Path rhumb validity
       sinC = sin course
       cosC = cos course
       tanC = tan course
-      lat0 = (pt ^. latitudeL)
-      lon0 = (pt ^. longitudeL)
-      ptellipsoid = pt ^. ellipsoid
+      lat0 = (pt ^. geodetic . latitudeL)
+      lon0 = (pt ^. geodetic . longitudeL)
+      ptellipsoid = pt ^. geodetic . ellipsoid
       e2 = eccentricity2 ptellipsoid
       e = sqrt e2
       m0 = meridianRadius ptellipsoid lat0
@@ -257,16 +259,17 @@ rhumbPath pt course = Path rhumb validity
 --
 -- This is equivalent to @rhumbPath pt (pi/2)@
 latitudePath ::
-   Geodetic             -- ^ Start point.
+   HasGeodetic g => 
+   g             -- ^ Start point.
    -> Path
 latitudePath pt = Path line alwaysValid
    where
       line distance = (pt2, pi/_2, _0) 
          where
             pt2 = Geodetic 
-               (pt ^. latitudeL) ((pt ^. longitudeL) + distance / r)
-               _0 (pt ^. ellipsoid)
-      r = latitudeRadius (pt ^. ellipsoid) (pt ^. latitudeL)
+               (pt ^. geodetic . latitudeL) ((pt ^. geodetic . longitudeL) + distance / r)
+               _0 (pt ^. geodetic . ellipsoid)
+      r = latitudeRadius (pt ^. geodetic . ellipsoid) (pt ^. geodetic . latitudeL)
 
 
 -- | A path from the specified point to the North Pole. Use negative distances

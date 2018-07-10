@@ -36,6 +36,7 @@ module Geodetics.Ellipsoids (
    V3,
    Matrix3,
    add3,
+   mult3,
    scale3,
    negate3,
    transform3,
@@ -59,18 +60,22 @@ import Prelude ()  -- Numeric instances.
 type Matrix3 a = V3 (V3 a)
 
 -- | Multiply a vector by a scalar.
-scale3 :: (Num a) =>
-   V3 (Quantity d a) -> Quantity d' a -> V3 (Quantity (d * d') a)
+scale3 :: (Num a, Functor f) =>
+   f (Quantity d a) -> Quantity d' a -> f (Quantity (d * d') a)
 scale3 v3 s = fmap (*s) v3
 
 -- | Negation of a vector.
-negate3 :: (Num a) => V3 (Quantity d a) -> V3 (Quantity d a)
-negate3 v3 = fmap negate v3
+-- negate3 :: (Functor f, Num a) => f (Quantity d a) -> f (Quantity d a)
+negate3 :: (Functor f, Num a) => f (Quantity d a) -> f (Quantity d a)
+negate3 = fmap negate
 
 -- | Add two vectors
-add3 :: (Num a) => V3 (Quantity d a) -> V3 (Quantity d a) -> V3 (Quantity d a)
+add3 :: (Num a, MonadZip m) => m (Quantity d a) -> m (Quantity d a) -> m (Quantity d a)
 add3 = mzipWith (+)
 
+-- | Add two vectors
+mult3 :: (Num a, MonadZip m) => m (Quantity d a) -> m (Quantity d a) -> m (Quantity (d * d) a)
+mult3 = mzipWith (*)
 
 -- | Multiply a matrix by a vector in the Dimensional type system.
 transform3 :: (Num a) =>
@@ -241,7 +246,7 @@ instance Monoid Helmert where
    mappend = (<>)
 
 -- | The inverse of a Helmert transformation.
-inverseHelmert :: Helmert -> Helmert
+inverseHelmert :: HasHelmert e => e -> Helmert
 inverseHelmert h = Helmert (negate $ cX h) (negate $ cY h) (negate $ cZ h) 
                            (negate $ helmertScale h) 
                            (negate $ rX h) (negate $ rY h) (negate $ rZ h)
@@ -252,7 +257,7 @@ inverseHelmert h = Helmert (negate $ cX h) (negate $ cY h) (negate $ cZ h)
 type ECEF = V3 (Length Double)
 
 -- | Apply a Helmert transformation to earth-centered coordinates.
-applyHelmert:: Helmert -> ECEF -> ECEF
+applyHelmert:: HasHelmert e => e -> ECEF -> ECEF
 applyHelmert h (V3 x y z) = V3 (
       cX h + s * (                x - rZ h * y + rY h * z))
       (cY h + s * (        rZ h  * x +        y - rX h * z))
@@ -337,11 +342,11 @@ _WGS84 =
       (298.257223563 *~ one)
       mempty
 
-helmertToWSG84 :: Ellipsoid -> ECEF -> ECEF
+helmertToWSG84 :: HasHelmert e => e -> ECEF -> ECEF
    -- ^ The Helmert transform that will convert a position wrt 
    -- this ellipsoid into a position wrt WGS84.
 helmertToWSG84 e = applyHelmert (helmert e)
-helmertFromWSG84 :: Ellipsoid -> ECEF -> ECEF
+helmertFromWSG84 :: HasHelmert e => e -> ECEF -> ECEF
    -- ^ And its inverse.
 helmertFromWSG84 e = applyHelmert (inverseHelmert $ helmert e)
 
@@ -354,46 +359,46 @@ helmertFromWSG84 e = applyHelmert (inverseHelmert $ helmert e)
 
    
 -- | Flattening (f) of an ellipsoid.
-flattening :: Ellipsoid -> Dimensionless Double
+flattening :: HasEllipsoid e => e -> Dimensionless Double
 flattening e = _1 / flatR e
 
 -- | The minor radius of an ellipsoid.
-minorRadius :: Ellipsoid -> Length Double
+minorRadius :: HasEllipsoid e => e -> Length Double
 minorRadius e = majorRadius e * (_1 - flattening e)
 
 
 -- | The eccentricity squared of an ellipsoid.
-eccentricity2 :: Ellipsoid -> Dimensionless Double
+eccentricity2 :: HasEllipsoid e => e -> Dimensionless Double
 eccentricity2 e = _2 * f - (f * f) where f = flattening e
 
 -- | The second eccentricity squared of an ellipsoid.
-eccentricity'2 :: Ellipsoid -> Dimensionless Double
+eccentricity'2 :: HasEllipsoid e => e -> Dimensionless Double
 eccentricity'2 e = (f * (_2 - f)) / (_1 - f * f) where f = flattening e
 
 
 -- | Distance from the surface at the specified latitude to the 
 -- axis of the Earth straight down. Also known as the radius of 
 -- curvature in the prime vertical, and often denoted @N@.
-normal :: Ellipsoid -> Angle Double -> Length Double
+normal :: HasEllipsoid e => e -> Angle Double -> Length Double
 normal e lat = majorRadius e / sqrt (_1 - eccentricity2 e * sin lat ^ pos2)
 
 
 -- | Radius of the circle of latitude: the distance from a point 
 -- at that latitude to the axis of the Earth.
-latitudeRadius :: Ellipsoid -> Angle Double -> Length Double
+latitudeRadius :: HasEllipsoid e => e -> Angle Double -> Length Double
 latitudeRadius e lat = normal e lat * cos lat
 
 
 -- | Radius of curvature in the meridian at the specified latitude. 
 -- Often denoted @M@.
-meridianRadius :: Ellipsoid -> Angle Double -> Length Double
+meridianRadius :: HasEllipsoid e => e -> Angle Double -> Length Double
 meridianRadius e lat = 
    majorRadius e * (_1 - eccentricity2 e) 
    / sqrt ((_1 - eccentricity2 e * sin lat ^ pos2) ^ pos3)
    
 
 -- | Radius of curvature of the ellipsoid perpendicular to the meridian at the specified latitude.
-primeVerticalRadius :: Ellipsoid -> Angle Double -> Length Double
+primeVerticalRadius :: HasEllipsoid e => e -> Angle Double -> Length Double
 primeVerticalRadius e lat =
    majorRadius e / sqrt (_1 - eccentricity2 e * sin lat ^ pos2)
 
@@ -404,7 +409,7 @@ primeVerticalRadius e lat =
 -- Mercator projection. The name "isometric" arises from the fact that at any point 
 -- on the ellipsoid equal increments of ψ and longitude λ give rise to equal distance 
 -- displacements along the meridians and parallels respectively.
-isometricLatitude :: Ellipsoid -> Angle Double -> Angle Double
+isometricLatitude :: HasEllipsoid e => e -> Angle Double -> Angle Double
 isometricLatitude ellipse lat = atanh sinLat - e * atanh (e * sinLat)
    where
       sinLat = sin lat
