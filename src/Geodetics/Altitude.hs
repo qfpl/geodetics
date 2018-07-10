@@ -1,8 +1,12 @@
+{-# LANGUAGE TypeSynonymInstances, FlexibleInstances #-}
+
 module Geodetics.Altitude (
-  HasAltitude (..)
+  HasAltitude (..),
+  groundPosition
 ) where
 
-import Numeric.Units.Dimensional.Prelude
+import Control.Lens(Lens', set)
+import Numeric.Units.Dimensional.Prelude(Length, _0)
 
 -- | All geographical coordinate systems need the concept of#
 -- altitude above a reference point, usually associated with
@@ -10,8 +14,16 @@ import Numeric.Units.Dimensional.Prelude
 -- 
 -- Minimum definition: altitude, setAltitude.
 class HasAltitude a where
-   altitude :: a -> Length Double
-   setAltitude :: Length Double -> a -> a
-   -- | Set altitude to zero.
-   groundPosition :: a -> a
-   groundPosition = setAltitude _0
+  altitude ::
+    Lens' a (Length Double)
+
+instance HasAltitude (Length Double) where
+  altitude =
+    id
+
+groundPosition ::
+  HasAltitude a =>
+  a
+  -> a
+groundPosition =
+  set altitude _0

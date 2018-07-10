@@ -5,11 +5,14 @@ module Geodetics.TransverseMercator(
    mkGridTM
 ) where
 
+import Control.Lens((^.))
 import Data.Function
 import Data.Monoid
 import Geodetics.Ellipsoids
 import Geodetics.Geodetic
 import Geodetics.Grid
+import Geodetics.Latitude
+import Geodetics.Longitude
 import Numeric.Units.Dimensional.Prelude hiding ((.))
 import Prelude ()
 
@@ -47,7 +50,7 @@ mkGridTM origin offset sf =
            gridN4 = ((35*~one)/(24*~one)) * n^pos3
         }
     where 
-       f = flattening $ ellipsoid origin
+       f = flattening (origin ^. ellipsoid)
        n = f / (_2-f)  -- Equivalent to (a-b)/(a+b) where b = (1-f)*a
 
 
@@ -60,8 +63,8 @@ m grid lat = bF0 * (gridN1 grid * dLat
                     + gridN3 grid * sin (_2 * dLat) * cos (_2 * sLat) 
                     - gridN4 grid * sin (_3 * dLat) * cos (_3 * sLat))
    where
-      dLat = lat - latitude (trueOrigin grid)
-      sLat = lat + latitude (trueOrigin grid)
+      dLat = lat - (trueOrigin grid ^. latitudeL)
+      sLat = lat + (trueOrigin grid ^. latitudeL)
       bF0 = minorRadius (gridEllipsoid grid) * gridScale grid
 
 
@@ -72,7 +75,7 @@ instance GridClass GridTM where
                            * (_5 + _3 * tanLat ^ pos2 + eta2 - _9 * tanLat ^ pos2 * eta2)  -- Term VIII
             - east' * east' ^ pos5 * (tanLat / ((720 *~ one) * rho * v ^ pos5))
                            * (61 *~ one + (90 *~ one) * tanLat ^ pos2 + (45 *~ one) * tanLat ^ pos4)) -- Term IX
-      (longitude (trueOrigin grid) 
+      ((trueOrigin grid ^. longitudeL) 
             + east' / (cosLat * v)  -- Term X
             - (east' ^ pos3 / (_6 * cosLat * v ^ pos3)) * (v / rho + _2 * tanLat ^ pos2)  -- Term XI
             + (east' ^ pos5 / ((120 *~ one) * cosLat * v ^ pos5)) 
@@ -85,7 +88,7 @@ instance GridClass GridTM where
       where
          GridPoint east' north' _ _ = falseOrigin grid `applyOffset` p
          lat' = fst $ head $ dropWhile ((> 0.01 *~ milli meter) . snd) 
-               $ tail $ iterate next (latitude $ trueOrigin grid, 1 *~ meter) 
+               $ tail $ iterate next (trueOrigin grid ^. latitudeL, 1 *~ meter) 
             where
                next (phi, _) = let delta = north' - m grid phi in (phi + delta / aF0, delta) 
                -- head and tail are safe because iterate returns an infinite list.
@@ -145,9 +148,9 @@ instance GridClass GridTM where
             "VI   = ", show term_VI, "\n"]
          -}
          -- Common subexpressions
-         lat = latitude geo
-         long = longitude geo
-         dLong = long - longitude (trueOrigin grid)
+         lat = geo ^. latitudeL
+         long = geo ^. longitudeL
+         dLong = long - (trueOrigin grid ^. longitudeL)
          sinLat = sin lat
          cosLat = cos lat
          tanLat = tan lat
@@ -155,4 +158,4 @@ instance GridClass GridTM where
          aF0 = (majorRadius $ gridEllipsoid grid) * gridScale grid
          e2 = eccentricity2 $ gridEllipsoid grid
          
-   gridEllipsoid = ellipsoid . trueOrigin
+   gridEllipsoid = (^. ellipsoid) . trueOrigin

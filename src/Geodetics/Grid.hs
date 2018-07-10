@@ -19,6 +19,7 @@ module Geodetics.Grid (
    toGridDigits
 ) where
 
+import Control.Lens((^.))
 import Data.Char
 import Data.Function
 import Data.Monoid (Monoid)
@@ -55,8 +56,8 @@ instance Eq (GridPoint r) where
       altGP p1 == altGP p2
 
 instance HasAltitude (GridPoint g) where
-   altitude = altGP
-   setAltitude h gp = gp{altGP = h}
+   altitude k (GridPoint e n a b) = 
+      fmap (\x -> GridPoint e n x b) (k a)
 
 
 
@@ -104,7 +105,7 @@ offsetNegate off = GridOffset (negate $ deltaEast off)
 applyOffset :: GridOffset -> GridPoint g -> GridPoint g
 applyOffset off p = GridPoint (eastings p + deltaEast off) 
                            (northings p + deltaNorth off)
-                           (altitude p + deltaAltitude off)
+                           (p ^. altitude + deltaAltitude off)
                            (gridBasis p)
 
 
@@ -128,7 +129,7 @@ offsetBearing off = atan2 (deltaEast off) (deltaNorth off)
 gridOffset :: GridPoint g -> GridPoint g -> GridOffset
 gridOffset p1 p2 = GridOffset (eastings p2 - eastings p1)
                               (northings p2 - northings p1)
-                              (altitude p2 - altitude p1)
+                              (p2 ^. altitude - p1 ^. altitude)
 
 
 -- | Coerce a grid point of one type into a grid point of a different type, 
@@ -138,7 +139,7 @@ gridOffset p1 p2 = GridOffset (eastings p2 - eastings p1)
 -- It should be used only to convert between distinguished grids (e.g. "UkNationalGrid") and
 -- their equivalent numerical definitions.
 unsafeGridCoerce :: b -> GridPoint a -> GridPoint b
-unsafeGridCoerce base p = GridPoint (eastings p) (northings p) (altitude p) base
+unsafeGridCoerce base p = GridPoint (eastings p) (northings p) (p ^. altitude) base
 
 
 

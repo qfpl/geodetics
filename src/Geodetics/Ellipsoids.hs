@@ -9,11 +9,16 @@ specific area.
 module Geodetics.Ellipsoids (
    -- ** Helmert transform between geodetic reference systems
    Helmert (..),
+   HasHelmert(..),
    inverseHelmert,
    ECEF,
    applyHelmert,
    -- ** Ellipsoid models of the Geoid
    Ellipsoid (..),
+   majorRadius,
+   flatR,
+   helmert,
+   HasEllipsoid(..),
    helmertFromWSG84,
    helmertToWSG84,
    _WGS84,
@@ -40,6 +45,8 @@ module Geodetics.Ellipsoids (
    cross3
 ) where
 
+import Control.Lens(Lens', (^.))
+import Control.Monad.Zip(MonadZip(mzipWith))
 import Data.Monoid (Monoid)
 import Data.Semigroup (Semigroup, (<>))
 import Linear.V3(V3(V3))
@@ -54,26 +61,22 @@ type Matrix3 a = V3 (V3 a)
 -- | Multiply a vector by a scalar.
 scale3 :: (Num a) =>
    V3 (Quantity d a) -> Quantity d' a -> V3 (Quantity (d * d') a)
-scale3 (V3 x y z) s = V3 (x*s) (y*s) (z*s)
-
+scale3 v3 s = fmap (*s) v3
 
 -- | Negation of a vector.
 negate3 :: (Num a) => V3 (Quantity d a) -> V3 (Quantity d a)
-negate3 (V3 x y z) = V3 (negate x) (negate y) (negate z)
+negate3 v3 = fmap negate v3
 
 -- | Add two vectors
 add3 :: (Num a) => V3 (Quantity d a) -> V3 (Quantity d a) -> V3 (Quantity d a)
-add3 (V3 x1 y1 z1) (V3 x2 y2 z2) = V3 (x1+x2) (y1+y2) (z1+z2)
+add3 = mzipWith (+)
 
 
 -- | Multiply a matrix by a vector in the Dimensional type system.
 transform3 :: (Num a) =>
    Matrix3 (Quantity d a) -> V3 (Quantity d' a) -> V3 (Quantity (d*d') a)
-transform3 (V3 tx ty tz) v = V3 (t tx v) (t ty v) (t tz v)
-   where
-      t (V3 x1 y1 z1) (V3 x2 y2 z2) = x1*x2 + y1*y2 + z1*z2
-
-
+transform3 v3 v = fmap (\u -> dot3 u v) v3
+   
 -- | Inverse of a 3x3 matrix.
 invert3 :: (Fractional a) =>
    Matrix3 (Quantity d a) -> Matrix3 (Quantity ((d*d)/(d*d*d)) a)
@@ -96,7 +99,7 @@ trans3 (V3 (V3 x1 y1 z1) (V3 x2 y2 z2) (V3 x3 y3 z3)) = V3 (V3 x1 x2 x3) (V3 y1 
 -- | Dot product of two vectors
 dot3 :: (Num a) =>
    V3 (Quantity d1 a) -> V3 (Quantity d2 a) -> Quantity (d1 * d2) a
-dot3 (V3 x1 y1 z1) (V3 x2 y2 z2) = x1*x2 + y1*y2 + z1*z2
+dot3 v3x v3y = sum (mzipWith (*) v3x v3y)
 
 -- | Cross product of two vectors
 cross3 :: (Num a) =>
@@ -105,10 +108,128 @@ cross3 (V3 x1 y1 z1) (V3 x2 y2 z2) = V3 (y1*z2 - z1*y2) (z1*x2 - x1*z2) (x1*y2 -
 
 
 -- | The 7 parameter Helmert transformation. The monoid instance allows composition.
-data Helmert = Helmert {
-   cX, cY, cZ :: Length Double,
-   helmertScale :: Dimensionless Double,  -- ^ Parts per million
-   rX, rY, rZ :: Dimensionless Double } deriving (Eq, Show)
+data Helmert = Helmert
+   (Length Double)
+   (Length Double)
+   (Length Double)
+   (Dimensionless Double)  -- ^ Parts per million
+   (Dimensionless Double)
+   (Dimensionless Double)
+   (Dimensionless Double)
+   deriving (Eq, Show)
+
+cX ::
+  HasHelmert a =>
+  a
+  -> Length Double
+cX =
+   (^. cXL)
+
+cY ::
+  HasHelmert a =>
+  a
+  -> Length Double
+cY =
+   (^. cYL)
+
+cZ ::
+  HasHelmert a =>
+  a
+  -> Length Double
+cZ =
+   (^. cZL)
+
+helmertScale ::
+  HasHelmert a =>
+  a
+  -> Dimensionless Double
+helmertScale =
+   (^. helmertScaleL)
+
+rX ::
+  HasHelmert a =>
+  a
+  -> Dimensionless Double
+rX =
+   (^. rXL)
+
+rY ::
+  HasHelmert a =>
+  a
+  -> Dimensionless Double
+rY =
+   (^. rYL)
+
+rZ ::
+  HasHelmert a =>
+  a
+  -> Dimensionless Double
+rZ =
+   (^. rZL)
+
+class HasHelmert a where
+   helmertL ::
+     Lens' a Helmert
+   cXL ::
+     Lens' a (Length Double)
+   {-# INLINE cXL #-}
+   cYL ::
+     Lens' a (Length Double)
+   {-# INLINE cYL #-}
+   cZL ::
+     Lens' a (Length Double)
+   {-# INLINE cZL #-}
+   helmertScaleL ::
+     Lens' a (Dimensionless Double)
+   {-# INLINE helmertScaleL #-}
+   rXL ::
+     Lens' a (Dimensionless Double)
+   {-# INLINE rXL #-}
+   rYL ::
+     Lens' a (Dimensionless Double)
+   {-# INLINE rYL #-}
+   rZL ::
+     Lens' a (Dimensionless Double)
+   {-# INLINE rZL #-}
+   cXL =
+      helmertL . cXL
+   cYL =
+      helmertL . cYL
+   cZL =
+      helmertL . cZL
+   helmertScaleL =
+      helmertL . helmertScaleL
+   rXL =
+      helmertL . rXL
+   rYL =
+      helmertL . rYL
+   rZL =
+      helmertL . rZL
+
+instance HasHelmert Helmert where
+   {-# INLINE cXL #-}
+   {-# INLINE cYL #-}
+   {-# INLINE cZL #-}
+   {-# INLINE helmertScaleL #-}
+   {-# INLINE rXL #-}
+   {-# INLINE rYL #-}
+   {-# INLINE rZL #-}
+   helmertL =
+      id
+   cXL k (Helmert cX' cY' cZ' helmertScale' rX' rY' rZ') =
+      fmap (\x -> Helmert x cY' cZ' helmertScale' rX' rY' rZ') (k cX')
+   cYL k (Helmert cX' cY' cZ' helmertScale' rX' rY' rZ') =
+      fmap (\x -> Helmert cX' x cZ' helmertScale' rX' rY' rZ') (k cY')
+   cZL k (Helmert cX' cY' cZ' helmertScale' rX' rY' rZ') =
+      fmap (\x -> Helmert cX' cY' x helmertScale' rX' rY' rZ') (k cZ')
+   helmertScaleL k (Helmert cX' cY' cZ' helmertScale' rX' rY' rZ') =
+      fmap (\x -> Helmert cX' cY' cZ' x rX' rY' rZ') (k helmertScale')
+   rXL k (Helmert cX' cY' cZ' helmertScale' rX' rY' rZ') =
+      fmap (\x -> Helmert cX' cY' cZ' helmertScale' x rY' rZ') (k rX')
+   rYL k (Helmert cX' cY' cZ' helmertScale' rX' rY' rZ') =
+      fmap (\x -> Helmert cX' cY' cZ' helmertScale' rX' x rZ') (k rY')
+   rZL k (Helmert cX' cY' cZ' helmertScale' rX' rY' rZ') =
+      fmap (\x -> Helmert cX' cY' cZ' helmertScale' rX' rY' x) (k rZ')
 
 instance Semigroup Helmert where
     h1 <> h2 = Helmert (cX h1 + cX h2) (cY h1 + cY h2) (cZ h1 + cZ h2)
@@ -153,15 +274,60 @@ applyHelmert h (V3 x y z) = V3 (
 -- > helmertToWGS84 = applyHelmert . helmert
 -- > helmertFromWGS84 e . helmertToWGS84 e = id
 data Ellipsoid =
-   Ellipsoid {
-      majorRadius ::
-         Length Double
-   ,  flatR ::
-         Dimensionless Double
-   ,  helmert ::
-         Helmert
-   }
+   Ellipsoid
+      (Length Double)         -- majorRadius
+      (Dimensionless Double)  -- flatR
+      Helmert                 -- helmert
    deriving (Eq, Show)
+
+majorRadius ::
+  HasEllipsoid e =>
+  e
+  -> Length Double
+majorRadius =
+   (^. majorRadiusL)
+
+flatR ::
+  HasEllipsoid e =>
+  e
+  -> Dimensionless Double
+flatR =
+   (^. flatRL)
+
+helmert ::
+  HasHelmert e =>
+  e
+  -> Helmert
+helmert =
+   (^. helmertL)
+
+class HasEllipsoid a where
+   ellipsoid ::   
+      Lens' a Ellipsoid
+   majorRadiusL ::
+      Lens' a (Length Double)
+   {-# INLINE majorRadiusL #-}
+   flatRL ::
+      Lens' a (Dimensionless Double)
+   {-# INLINE flatRL #-}
+   majorRadiusL =
+      ellipsoid . majorRadiusL
+   flatRL =  
+      ellipsoid . flatRL
+
+instance HasEllipsoid Ellipsoid where
+   {-# INLINE majorRadiusL #-}
+   {-# INLINE flatRL #-}
+   ellipsoid =
+      id
+   majorRadiusL k (Ellipsoid r f h) =
+      fmap (\r' -> Ellipsoid r' f h) (k r)
+   flatRL k (Ellipsoid r f h) =
+      fmap (\f' -> Ellipsoid r f' h) (k f)
+
+instance HasHelmert Ellipsoid where
+   helmertL k (Ellipsoid r f h) =
+      fmap (\h' -> Ellipsoid r f h') (k h)
 
 _WGS84 ::
   Ellipsoid

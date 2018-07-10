@@ -1,6 +1,7 @@
 module Geodetics.Geodetic (
    -- ** Geodetic Coordinates
    Geodetic (..),
+   HasGeodetic(..),
    readGroundPosition,
    toLocal,
    toWGS84,
@@ -18,12 +19,14 @@ module Geodetics.Geodetic (
    _WGS84
 ) where
 
-
+import Control.Lens(Lens', (^.))
 import Data.Char (chr)
-import Data.Function
+import Data.Function((.))
 import Data.Maybe
 import Data.Monoid
 import Geodetics.Altitude
+import Geodetics.Latitude
+import Geodetics.Longitude
 import Geodetics.Ellipsoids
 import Geodetics.LatLongParser
 import Linear.V3(V3(V3))
@@ -60,17 +63,42 @@ import qualified Prelude as P
 -- physical location.  If you want to find out if two co-ordinates are
 -- the same to within a given tolerance then use "geometricDistance"
 -- (or its squared variant to avoid an extra @sqrt@ operation).
-data Geodetic = Geodetic {
-   latitude, longitude :: Angle Double,
-   geoAlt :: Length Double,
-   ellipsoid :: Ellipsoid
-}
+data Geodetic =
+  Geodetic
+     (Angle Double)
+     (Angle Double)
+     (Length Double)
+     Ellipsoid
+
+class HasGeodetic a where
+   geodetic ::
+     Lens' a Geodetic
+
+instance HasGeodetic Geodetic where
+   geodetic =
+      id
+
+instance HasEllipsoid Geodetic where
+   ellipsoid k (Geodetic lat' lon' alt' e) =
+      fmap (\x -> Geodetic lat' lon' alt' x) (k e)
+
+instance HasLatitude Geodetic where
+   latitudeL k (Geodetic lat' lon' alt' e) =
+      fmap (\x -> Geodetic x lon' alt' e) (k lat')
+
+instance HasLongitude Geodetic where
+  longitudeL k (Geodetic lat' lon' alt' e) =
+      fmap (\x -> Geodetic lat' x alt' e) (k lon')
+
+instance HasAltitude Geodetic where
+  altitude k (Geodetic lat' lon' alt' e) =
+      fmap (\x -> Geodetic lat' lon' x e) (k alt')
 
 instance Show Geodetic where
    show g = concat [
-      showAngle (abs $ latitude g),  " ", letter "SN" (latitude g),  ", ",
-      showAngle (abs $ longitude g), " ", letter "WE" (longitude g), ", ", 
-      show (altitude g), " ", show (ellipsoid g)]
+      showAngle (abs $ (g ^. latitudeL)),  " ", letter "SN" (g ^. latitudeL),  ", ",
+      showAngle (abs $ (g ^. longitudeL)), " ", letter "WE" (g ^. longitudeL), ", ", 
+      show (g ^. altitude), " ", show (g ^. ellipsoid)]
       where letter s n = [s !! (if n < _0 then 0 else 1)]
 
 
@@ -116,20 +144,13 @@ showAngle a
       (s, ds) = s1 `P.divMod` 100
       dstr = reverse $ take 2 $ reverse (show ds) ++ "00" -- Decimal fraction with zero padding.
          
-
-instance HasAltitude Geodetic where
-   altitude = geoAlt
-   setAltitude h g = g{geoAlt = h}
-
-   
-   
 -- | The point on the Earth diametrically opposite the argument, with
 -- the same altitude.
 antipode :: Geodetic -> Geodetic
-antipode g = Geodetic lat long (geoAlt g) (ellipsoid g)
+antipode g = Geodetic lat long (g ^. altitude) (g ^. ellipsoid)
    where
-      lat = negate $ latitude g
-      long' = longitude g - 180 *~ degree
+      lat = negate $ (g ^. latitudeL)
+      long' = (g ^. longitudeL) - 180 *~ degree
       long | long' < _0  = long' + 360 *~ degree
            | otherwise  = long' 
 
@@ -143,13 +164,15 @@ geoToEarth geo = V3 (
       ((n + h) * coslat * sinlong)
       ((n * (_1 - eccentricity2 e) + h) * sinlat)
    where 
-      n = normal e $ latitude geo
-      e = ellipsoid geo
-      coslat = cos $ latitude geo
-      coslong = cos $ longitude geo
-      sinlat = sin $ latitude geo
-      sinlong = sin $ longitude geo
-      h = altitude geo
+      geolat = geo ^. latitudeL
+      geolon = geo ^. longitudeL
+      n = normal e $ geolat
+      e = geo ^. ellipsoid
+      coslat = cos $ geolat
+      coslong = cos $ geolon
+      sinlat = sin $ geolat
+      sinlong = sin $ geolon
+      h = geo ^. altitude
 
 
 -- | Convert an earth centred coordinate into a geodetic coordinate on 
@@ -186,18 +209,18 @@ earthToGeo e (V3 x y z) = (phi, atan2 y x, sqrt (l ^ pos2 + p2) - norm)
 toLocal :: Ellipsoid -> Geodetic -> Geodetic
 toLocal e2 g = Geodetic lat lon alt e2
    where
-      alt = altitude g
+      alt = g ^. altitude
       (lat, lon, _) = earthToGeo e2 $ applyHelmert h $ geoToEarth g
-      h = helmert (ellipsoid g) `mappend` inverseHelmert (helmert e2)
+      h = helmert (g ^. ellipsoid) `mappend` inverseHelmert (helmert e2)
 
 -- | Convert a position from any geodetic to WGS84, assuming local
 -- altitude stays constant.
 toWGS84 :: Geodetic -> Geodetic
 toWGS84 g = Geodetic lat lon alt _WGS84
    where
-      alt = altitude g
+      alt = g ^. altitude
       (lat, lon, _) = earthToGeo _WGS84 $ applyHelmert h $ geoToEarth g
-      h = helmert (ellipsoid g)
+      h = helmert (g ^. ellipsoid)
 
 
 -- | The absolute distance in a straight line between two geodetic 
@@ -252,12 +275,13 @@ groundDistance p1 p2 = do
        alpha2 = atan2(cosU1 * sin lambda) (cosU1 * sinU2 * cos lambda - sinU1 * cosU2)
      return (s, alpha1, alpha2)
   where
-    f = flattening $ ellipsoid p1
-    a = majorRadius $ ellipsoid p1
-    b = minorRadius $ ellipsoid p1
-    l = abs $ longitude p1 - longitude p2
-    u1 = atan ((_1-f) * tan (latitude p1))
-    u2 = atan ((_1-f) * tan (latitude p2))
+    p1ellipsoid = p1 ^. ellipsoid
+    f = flattening p1ellipsoid
+    a = majorRadius p1ellipsoid
+    b = minorRadius p1ellipsoid
+    l = abs $ (p1 ^. longitudeL) - (p2 ^. longitudeL)
+    u1 = atan ((_1-f) * tan (p1 ^. latitudeL))
+    u2 = atan ((_1-f) * tan (p2 ^. latitudeL))
     sinU1 = sin u1
     cosU1 = cos u1
     sinU2 = sin u2
