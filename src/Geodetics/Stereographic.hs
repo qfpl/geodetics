@@ -1,3 +1,5 @@
+{-# LANGUAGE NoImplicitPrelude #-}
+
 {- |
 The following is based on equations in Section 1.4.7.1 in 
 OGP Surveying and Positioning Guidance Note number 7, part 2 – August 2006
@@ -12,15 +14,14 @@ module Geodetics.Stereographic (
 ) where
 
 import Control.Lens(Lens', (^.))
-import Geodetics.Altitude
+import Geodetics.Altitude(HasAltitude(altitude))
 import Geodetics.Ellipsoids
-import Geodetics.Geodetic
-import Geodetics.Grid
-import Geodetics.GridScale
-import Geodetics.Latitude
-import Geodetics.Longitude
+import Geodetics.Geodetic(Geodetic(Geodetic), HasGeodetic(geodetic))
+import Geodetics.Grid(HasGridOffset(gridOffsetL), GridClass(gridEllipsoid), GridOffset, GridPoint(GridPoint), toGrid, fromGrid, applyOffset, offsetNegate, gridBasis)
+import Geodetics.GridScale(HasGridScale(gridScale))
+import Geodetics.Latitude(HasLatitude(latitudeL))
+import Geodetics.Longitude(HasLongitude(longitudeL))
 import Numeric.Units.Dimensional.Prelude
-import Prelude ()
 
 
 -- | A stereographic projection with its origin at an arbitrary point on Earth, other than the poles.

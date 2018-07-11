@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE FlexibleContexts, TypeOperators, TypeFamilies #-}
 
 {- | An Ellipsoid is a reasonable best fit for the surface of the 
@@ -51,10 +52,7 @@ import Control.Monad.Zip(MonadZip(mzipWith))
 import Data.Monoid (Monoid)
 import Data.Semigroup (Semigroup, (<>))
 import Linear.V3(V3(V3))
-import Numeric.Units.Dimensional
 import Numeric.Units.Dimensional.Prelude
-import Prelude ()  -- Numeric instances.
-
 
 -- | 3x3 transform matrix for V3.
 type Matrix3 a = V3 (V3 a)

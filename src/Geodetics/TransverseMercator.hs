@@ -1,3 +1,5 @@
+{-# LANGUAGE NoImplicitPrelude #-}
+
 module Geodetics.TransverseMercator(
    GridTM (..),
    HasGridTM(..),
@@ -5,18 +7,16 @@ module Geodetics.TransverseMercator(
 ) where
 
 import Control.Lens(Lens', (^.))
-import Data.Function
-import Data.Monoid
-import Geodetics.Altitude
+import Data.Function((.), id)
+import Geodetics.Altitude(HasAltitude(altitude))
 import Geodetics.Ellipsoids
-import Geodetics.Geodetic
-import Geodetics.Grid
-import Geodetics.GridScale
-import Geodetics.Latitude
-import Geodetics.Longitude
-import Numeric.Units.Dimensional.Prelude hiding ((.))
+import Geodetics.Geodetic(HasGeodetic(geodetic), Geodetic(Geodetic))
+import Geodetics.Grid(HasGridOffset(gridOffsetL), GridClass(gridEllipsoid), GridOffset(GridOffset), GridPoint(GridPoint), fromGrid, toGrid, applyOffset, gridBasis, offsetNegate)
+import Geodetics.GridScale(HasGridScale(gridScale))
+import Geodetics.Latitude(HasLatitude(latitudeL))
+import Geodetics.Longitude(HasLongitude(longitudeL))
+import Numeric.Units.Dimensional.Prelude hiding ((.), id)
 import Prelude ()
-import qualified Prelude as Prelude(id)
 
 -- | A Transverse Mercator projection gives an approximate mapping of the ellipsoid on to a 2-D grid. It models
 -- a sheet curved around the ellipsoid so that it touches it at one north-south line (hence making it part of
@@ -64,7 +64,7 @@ class HasGridTM a where
 
 instance HasGridTM GridTM where
   gridTM =
-    Prelude.id
+    id
   gridN1 k (GridTM t f s n1 n2 n3 n4) =
     fmap (\x -> GridTM t f s x n2 n3 n4) (k n1)
   {-# INLINE gridN1 #-}

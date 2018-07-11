@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
 -- | Distinguished coordinate systems for the United Kingdom.
@@ -9,18 +10,17 @@ module Geodetics.UK (
    toUkGridReference
 ) where
 
-import Control.Applicative
+import Control.Applicative()
 import Control.Lens((^.))
-import Control.Monad
-import Data.Array
-import Data.Char
-import Data.Monoid
-import Geodetics.Geodetic
-import Geodetics.Grid
+import Control.Monad(guard)
+import Data.Array(Array, inRange, (!), listArray)
+import Data.Char(ord)
+import Geodetics.Geodetic(Geodetic(Geodetic))
+import Geodetics.Grid(GridClass, GridOffset(GridOffset), GridPoint(GridPoint), toGrid, fromGrid, gridEllipsoid, unsafeGridCoerce, fromGridDigits, applyOffset, toGridDigits, eastings, northings)
 import Geodetics.Ellipsoids
-import Geodetics.TransverseMercator
+import Geodetics.TransverseMercator(GridTM, mkGridTM)
 import Numeric.Units.Dimensional.Prelude
-import qualified Prelude as P
+import qualified Prelude as P((-))
 
 
 

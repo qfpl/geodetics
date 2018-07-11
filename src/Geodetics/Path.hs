@@ -1,18 +1,17 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE TypeOperators, TypeFamilies, FlexibleContexts #-}
 -- | The implementation assumes IEEE 754 arithmetic.
 
 module Geodetics.Path where
 
 import Control.Lens((^.))
-import Control.Monad
+import Control.Monad(guard)
 import Geodetics.Ellipsoids
-import Geodetics.Geodetic
-import Geodetics.Latitude
-import Geodetics.Longitude
+import Geodetics.Geodetic(Geodetic(Geodetic), HasGeodetic(geodetic), earthToGeo, geoToEarth, properAngle)
+import Geodetics.Latitude(HasLatitude(latitudeL))
+import Geodetics.Longitude(HasLongitude(longitudeL))
 import Linear.V3(V3(V3))
 import Numeric.Units.Dimensional.Prelude
-import Prelude ()
-
 
 -- | Lower and upper exclusive bounds within which a path is valid. 
 type PathValidity = (Length Double, Length Double)

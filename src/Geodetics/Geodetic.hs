@@ -1,3 +1,5 @@
+{-# LANGUAGE NoImplicitPrelude #-}
+
 module Geodetics.Geodetic (
    -- ** Geodetic Coordinates
    Geodetic (..),
@@ -20,19 +22,18 @@ module Geodetics.Geodetic (
 ) where
 
 import Control.Lens(Lens', (^.))
-import Data.Char (chr)
+import Data.Char(chr)
 import Data.Function((.))
-import Data.Maybe
-import Data.Monoid
-import Geodetics.Altitude
-import Geodetics.Latitude
-import Geodetics.Longitude
+import Data.Maybe(listToMaybe)
+import Geodetics.Altitude(HasAltitude(altitude), groundPosition)
+import Geodetics.Latitude(HasLatitude(latitudeL))
+import Geodetics.Longitude(HasLongitude(longitudeL))
 import Geodetics.Ellipsoids
-import Geodetics.LatLongParser
+import Geodetics.LatLongParser(latLong)
 import Linear.V3(V3(V3))
 import Numeric.Units.Dimensional.Prelude hiding ((.))
-import Text.ParserCombinators.ReadP
-import qualified Prelude as P
+import Text.ParserCombinators.ReadP(readP_to_S)
+import qualified Prelude as P(abs, round, (*), divMod)
 
 -- | Defines a three-D position on or around the Earth using latitude,
 -- longitude and altitude with respect to a specified ellipsoid, with

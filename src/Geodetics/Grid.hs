@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies, FlexibleInstances #-}
 
 module Geodetics.Grid (
@@ -24,14 +25,13 @@ module Geodetics.Grid (
 ) where
 
 import Control.Lens(Lens', (^.))
-
-import Data.Char
-import Data.Function
+import Data.Char(isDigit, digitToInt)
+import Data.Function((.))
 import Data.Monoid (Monoid)
 import Data.Semigroup (Semigroup, (<>))
-import Geodetics.Altitude
-import Geodetics.Geodetic
-import Geodetics.Ellipsoids
+import Geodetics.Altitude(HasAltitude(altitude))
+import Geodetics.Geodetic(Geodetic)
+import Geodetics.Ellipsoids(Ellipsoid)
 import Numeric.Units.Dimensional.Prelude hiding ((.))
 import qualified Prelude as P
 

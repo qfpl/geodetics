@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE TypeSynonymInstances, FlexibleInstances #-}
 
 module Geodetics.Longitude (
@@ -5,7 +6,9 @@ module Geodetics.Longitude (
 ) where
 
 import Control.Lens(Lens')
+import Data.Function(id)
 import Numeric.Units.Dimensional.Prelude(Angle)
+import Prelude(Double)
 
 class HasLongitude a where
   longitudeL ::

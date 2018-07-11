@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE TypeSynonymInstances, FlexibleInstances #-}
 
 module Geodetics.Altitude (
@@ -6,7 +7,9 @@ module Geodetics.Altitude (
 ) where
 
 import Control.Lens(Lens', set)
+import Data.Function(id)
 import Numeric.Units.Dimensional.Prelude(Length, _0)
+import Prelude(Double)
 
 -- | All geographical coordinate systems need the concept of#
 -- altitude above a reference point, usually associated with

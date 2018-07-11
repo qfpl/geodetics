@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE TypeSynonymInstances, FlexibleInstances #-}
 
 module Geodetics.GridScale (
@@ -5,7 +6,9 @@ module Geodetics.GridScale (
 ) where
 
 import Control.Lens(Lens')
+import Data.Function(id)
 import Numeric.Units.Dimensional(Dimensionless)
+import Prelude(Double)
 
 class HasGridScale a where
   gridScale ::
