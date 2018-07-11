@@ -49,6 +49,7 @@ library
                    Geodetics.Ellipsoids,
                    Geodetics.Geodetic,
                    Geodetics.Grid,
+                   Geodetics.GridScale,
                    Geodetics.Latitude,
                    Geodetics.LatLongParser,
                    Geodetics.Longitude,

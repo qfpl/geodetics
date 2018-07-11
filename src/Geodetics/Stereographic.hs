@@ -16,6 +16,7 @@ import Geodetics.Altitude
 import Geodetics.Ellipsoids
 import Geodetics.Geodetic
 import Geodetics.Grid
+import Geodetics.GridScale
 import Geodetics.Latitude
 import Geodetics.Longitude
 import Numeric.Units.Dimensional.Prelude
@@ -43,8 +44,6 @@ data GridStereo = GridStereo
 class HasGridStereo a where
    gridStereo ::
      Lens' a GridStereo
-   gridScaleL :: 
-     Lens' a (Dimensionless Double)
    gridRL ::
      Lens' a (Length Double)
    gridNL :: 
@@ -61,9 +60,6 @@ class HasGridStereo a where
      Lens' a (Length Double)
    gridHL :: 
      Lens' a (Length Double)
-   gridScaleL =
-      gridStereo . gridScaleL
-   {-# INLINE gridScaleL #-}
    gridRL =
       gridStereo . gridRL
    {-# INLINE gridRL #-}
@@ -89,12 +85,14 @@ class HasGridStereo a where
       gridStereo . gridHL
    {-# INLINE gridHL #-}
 
+instance HasGridScale GridStereo where
+   gridScale k (GridStereo t o s r dn dc dsin dcos c g h) =
+      fmap (\x -> GridStereo t o x r dn dc dsin dcos c g h) (k s)
+   {-# INLINE gridScale #-}
+
 instance HasGridStereo GridStereo where
    gridStereo =
       id
-   gridScaleL k (GridStereo t o s r dn dc dsin dcos c g h) =
-      fmap (\x -> GridStereo t o x r dn dc dsin dcos c g h) (k s)
-   {-# INLINE gridScaleL #-}
    gridRL k (GridStereo t o s r dn dc dsin dcos c g h) =
       fmap (\x -> GridStereo t o s x dn dc dsin dcos c g h) (k r)
    {-# INLINE gridRL #-}
@@ -186,8 +184,8 @@ instance GridClass GridStereo where
          e = sqrt $ eccentricity2 $ (geo ^. ellipsoid)
          long0 = op $ (grid ^. longitudeL)
          b = _1 + sinLatC * (grid ^. gridSinL) + cosLatC * (grid ^. gridCosL) * cos (longC - long0)
-         east = _2 * (grid ^. gridRL) * (grid ^. gridScaleL) * cosLatC * sin (longC - long0) / b
-         north = _2 * (grid ^. gridRL) * (grid ^. gridScaleL) * (sinLatC * (grid ^. gridCosL) - cosLatC * (grid ^. gridSinL) * cos (longC - long0)) / b
+         east = _2 * (grid ^. gridRL) * (grid ^. gridScale) * cosLatC * sin (longC - long0) / b
+         north = _2 * (grid ^. gridRL) * (grid ^. gridScale) * (sinLatC * (grid ^. gridCosL) - cosLatC * (grid ^. gridSinL) * cos (longC - long0)) / b
    
    fromGrid gp = 
       {- trace (    -- Remove comment brackets for debugging.
@@ -206,7 +204,7 @@ instance GridClass GridStereo where
          long0 = op (grid ^. longitudeL)
          i = atan2 east' ((grid ^. gridHL) + north')
          j = atan2 east' ((grid ^. gridGL) - north') - i
-         latC = (grid ^. gridLatCL) + _2 * atan2 (north' - east' * tan (j/_2)) (_2 * (grid ^. gridRL) * (grid ^. gridScaleL))
+         latC = (grid ^. gridLatCL) + _2 * atan2 (north' - east' * tan (j/_2)) (_2 * (grid ^. gridRL) * (grid ^. gridScale))
          longC = j + _2 * i + long0
          sinLatC = sin latC
          long = (longC - long0) / (grid ^. gridNL) + long0

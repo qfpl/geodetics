@@ -1,38 +1,112 @@
 {-# LANGUAGE MultiParamTypeClasses, FlexibleInstances #-}
 
 module Geodetics.TransverseMercator(
-   GridTM (trueOrigin, falseOrigin, gridScale),
+   GridTM (..),
+   HasGridTM(..),
    mkGridTM
 ) where
 
-import Control.Lens((^.))
+import Control.Lens(Lens', (^.))
 import Data.Function
 import Data.Monoid
+import Geodetics.Altitude
 import Geodetics.Ellipsoids
 import Geodetics.Geodetic
 import Geodetics.Grid
+import Geodetics.GridScale
 import Geodetics.Latitude
 import Geodetics.Longitude
 import Numeric.Units.Dimensional.Prelude hiding ((.))
 import Prelude ()
+import qualified Prelude as Prelude(id)
 
 -- | A Transverse Mercator projection gives an approximate mapping of the ellipsoid on to a 2-D grid. It models
 -- a sheet curved around the ellipsoid so that it touches it at one north-south line (hence making it part of
 -- a slightly elliptical cylinder).
-data GridTM = GridTM {
-   trueOrigin :: Geodetic,
+data GridTM = GridTM
+   Geodetic
       -- ^ A point on the line where the projection touches the ellipsoid (altitude is ignored).
-   falseOrigin :: GridOffset,
+   GridOffset
       -- ^ The grid position of the true origin. Used to avoid negative coordinates over 
       -- the area of interest. The altitude gives a vertical offset from the ellipsoid.
-   gridScale :: Dimensionless Double,
+   (Dimensionless Double)
       -- ^ A scaling factor that balances the distortion between the east & west edges and the middle 
       -- of the projection.
       
    -- Remaining elements are memoised parameters computed from the ellipsoid underlying the true origin.
-   gridN1, gridN2, gridN3, gridN4 :: Dimensionless Double
-} deriving (Show)
+   (Dimensionless Double)
+   (Dimensionless Double)
+   (Dimensionless Double)
+   (Dimensionless Double)
+   deriving (Show)
 
+class HasGridTM a where
+  gridTM ::
+    Lens' a GridTM
+  gridN1 ::
+    Lens' a (Dimensionless Double)
+  gridN2 ::
+    Lens' a (Dimensionless Double)
+  gridN3 ::
+    Lens' a (Dimensionless Double)
+  gridN4 ::
+    Lens' a (Dimensionless Double)
+  gridN1 =
+    gridTM . gridN1
+  {-# INLINE gridN1 #-}
+  gridN2 =
+    gridTM . gridN2
+  {-# INLINE gridN2 #-}
+  gridN3 =
+    gridTM . gridN3
+  {-# INLINE gridN3 #-}
+  gridN4 =
+    gridTM . gridN4
+  {-# INLINE gridN4 #-}
+
+instance HasGridTM GridTM where
+  gridTM =
+    Prelude.id
+  gridN1 k (GridTM t f s n1 n2 n3 n4) =
+    fmap (\x -> GridTM t f s x n2 n3 n4) (k n1)
+  {-# INLINE gridN1 #-}
+  gridN2 k (GridTM t f s n1 n2 n3 n4) =
+    fmap (\x -> GridTM t f s n1 x n3 n4) (k n2)
+  {-# INLINE gridN2 #-}
+  gridN3 k (GridTM t f s n1 n2 n3 n4) =
+    fmap (\x -> GridTM t f s n1 n2 x n4) (k n3)
+  {-# INLINE gridN3 #-}
+  gridN4 k (GridTM t f s n1 n2 n3 n4) =
+    fmap (\x -> GridTM t f s n1 n2 n3 x) (k n4)
+  {-# INLINE gridN4 #-}
+
+instance HasGridScale GridTM where
+  gridScale k (GridTM t f s n1 n2 n3 n4) =
+    fmap (\x -> GridTM t f x n1 n2 n3 n4) (k s)
+
+instance HasGeodetic GridTM where
+  geodetic k (GridTM t f s n1 n2 n3 n4) =
+    fmap (\x -> GridTM x f s n1 n2 n3 n4) (k t)
+
+instance HasGridOffset GridTM where
+  gridOffsetL k (GridTM t f s n1 n2 n3 n4) =
+    fmap (\x -> GridTM t x s n1 n2 n3 n4) (k f)
+
+instance HasLatitude GridTM where
+  latitudeL =
+    geodetic . latitudeL
+
+instance HasLongitude GridTM where
+  longitudeL =
+    geodetic . longitudeL
+
+instance HasAltitude GridTM where
+  altitude =
+    geodetic . altitude
+
+instance HasEllipsoid GridTM where
+  ellipsoid =
+    geodetic . ellipsoid
 
 -- | Create a Transverse Mercator grid.
 mkGridTM :: 
@@ -41,14 +115,13 @@ mkGridTM ::
    -> Dimensionless Double  -- ^ Scale factor.
    -> GridTM
 mkGridTM origin offset sf =
-   GridTM {trueOrigin = origin,
-           falseOrigin = offset,
-           gridScale = sf,
-           gridN1 = _1 + n + (_5/_4) * n^pos2 + (_5/_4) * n^pos3,
-           gridN2 = _3 * n + _3 * n^pos2 + ((21*~one)/_8) * n^pos3,
-           gridN3 = ((15*~one)/_8) * (n^pos2 + n^pos3),
-           gridN4 = ((35*~one)/(24*~one)) * n^pos3
-        }
+   GridTM  origin
+           offset
+           sf
+           (_1 + n + (_5/_4) * n^pos2 + (_5/_4) * n^pos3)
+           (_3 * n + _3 * n^pos2 + ((21*~one)/_8) * n^pos3)
+           (((15*~one)/_8) * (n^pos2 + n^pos3))
+           (((35*~one)/(24*~one)) * n^pos3)
     where 
        f = flattening (origin ^. ellipsoid)
        n = f / (_2-f)  -- Equivalent to (a-b)/(a+b) where b = (1-f)*a
@@ -58,14 +131,14 @@ mkGridTM origin offset sf =
 
 -- | Equation C3 from reference [1].
 m :: GridTM -> Dimensionless Double -> Length Double
-m grid lat = bF0 * (gridN1 grid * dLat 
-                    - gridN2 grid * sin dLat * cos sLat
-                    + gridN3 grid * sin (_2 * dLat) * cos (_2 * sLat) 
-                    - gridN4 grid * sin (_3 * dLat) * cos (_3 * sLat))
+m grid lat = bF0 * (grid ^. gridN1 * dLat 
+                    - grid ^. gridN2 * sin dLat * cos sLat
+                    + grid ^. gridN3 * sin (_2 * dLat) * cos (_2 * sLat) 
+                    - grid ^. gridN4 * sin (_3 * dLat) * cos (_3 * sLat))
    where
-      dLat = lat - (trueOrigin grid ^. latitudeL)
-      sLat = lat + (trueOrigin grid ^. latitudeL)
-      bF0 = minorRadius (gridEllipsoid grid) * gridScale grid
+      dLat = lat - (grid ^. geodetic . latitudeL)
+      sLat = lat + (grid ^. geodetic . latitudeL)
+      bF0 = minorRadius (gridEllipsoid grid) * (grid ^. gridScale)
 
 
 instance GridClass GridTM where
@@ -75,7 +148,7 @@ instance GridClass GridTM where
                            * (_5 + _3 * tanLat ^ pos2 + eta2 - _9 * tanLat ^ pos2 * eta2)  -- Term VIII
             - east' * east' ^ pos5 * (tanLat / ((720 *~ one) * rho * v ^ pos5))
                            * (61 *~ one + (90 *~ one) * tanLat ^ pos2 + (45 *~ one) * tanLat ^ pos4)) -- Term IX
-      ((trueOrigin grid ^. longitudeL) 
+      ((grid ^. geodetic . longitudeL) 
             + east' / (cosLat * v)  -- Term X
             - (east' ^ pos3 / (_6 * cosLat * v ^ pos3)) * (v / rho + _2 * tanLat ^ pos2)  -- Term XI
             + (east' ^ pos5 / ((120 *~ one) * cosLat * v ^ pos5)) 
@@ -86,9 +159,9 @@ instance GridClass GridTM where
             
             
       where
-         GridPoint east' north' _ _ = falseOrigin grid `applyOffset` p
+         GridPoint east' north' _ _ = (grid ^. gridOffsetL) `applyOffset` p
          lat' = fst $ head $ dropWhile ((> 0.01 *~ milli meter) . snd) 
-               $ tail $ iterate next (trueOrigin grid ^. latitudeL, 1 *~ meter) 
+               $ tail $ iterate next (grid ^. geodetic . latitudeL, 1 *~ meter) 
             where
                next (phi, _) = let delta = north' - m grid phi in (phi + delta / aF0, delta) 
                -- head and tail are safe because iterate returns an infinite list.
@@ -102,11 +175,11 @@ instance GridClass GridTM where
          eta2 = v / rho - _1
                
                
-         aF0 = majorRadius (gridEllipsoid grid) * gridScale grid
+         aF0 = majorRadius (gridEllipsoid grid) * (grid ^. gridScale)
          e2 = eccentricity2 $ gridEllipsoid grid
          grid = p ^. gridBasis
          
-   toGrid grid geo = applyOffset (off  `mappend` (offsetNegate $ falseOrigin grid)) $ 
+   toGrid grid geo = applyOffset (off  `mappend` (offsetNegate (grid ^. gridOffsetL))) $ 
                      GridPoint _0 _0 _0 grid
       where
          v = aF0 / sqrt (_1 - e2 * sinLat2)
@@ -150,12 +223,12 @@ instance GridClass GridTM where
          -- Common subexpressions
          lat = geo ^. latitudeL
          long = geo ^. longitudeL
-         dLong = long - (trueOrigin grid ^. longitudeL)
+         dLong = long - (grid ^. geodetic . longitudeL)
          sinLat = sin lat
          cosLat = cos lat
          tanLat = tan lat
          sinLat2 = sinLat ^ pos2
-         aF0 = (majorRadius $ gridEllipsoid grid) * gridScale grid
+         aF0 = (majorRadius $ gridEllipsoid grid) * (grid ^. gridScale)
          e2 = eccentricity2 $ gridEllipsoid grid
-         
-   gridEllipsoid = (^. ellipsoid) . trueOrigin
+   
+   gridEllipsoid = (^. ellipsoid) . (^. geodetic)

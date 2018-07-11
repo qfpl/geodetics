@@ -48,12 +48,12 @@ class GridClass r where
 
 
 -- | A point on the specified grid. 
-data GridPoint r = GridPoint {
-   eastingsX :: Length Double,
-   northingsX :: Length Double,
-   altGPX :: Length Double,
-   gridBasisX :: r
-} deriving (Show)
+data GridPoint r = GridPoint 
+   (Length Double)
+   (Length Double)
+   (Length Double)
+   r
+   deriving (Show)
 
 class HasGridPoint a r | a -> r where
    gridPoint ::
