@@ -10,6 +10,7 @@ module Geodetics.UK (
 ) where
 
 import Control.Applicative
+import Control.Lens((^.))
 import Control.Monad
 import Data.Array
 import Data.Char
@@ -129,8 +130,8 @@ toUkGridReference :: Int -> GridPoint UkNationalGrid -> Maybe String
 toUkGridReference n p
    | n < 0         = error "toUkGridReference: precision argument must not be negative."
    | otherwise     = do
-      (gx, strEast) <- toGridDigits ukGridSquare n $ eastings p + 1000 *~ kilo meter
-      (gy, strNorth) <- toGridDigits ukGridSquare n $ northings p + 500 *~ kilo meter
+      (gx, strEast) <- toGridDigits ukGridSquare n $ (p ^. eastings) + 1000 *~ kilo meter
+      (gy, strNorth) <- toGridDigits ukGridSquare n $ (p ^. northings) + 500 *~ kilo meter
       let (gx1, gx2) = (fromIntegral gx) `divMod` 5
           (gy1, gy2) = (fromIntegral gy) `divMod` 5
       guard (gx1 < 5 && gy1 < 5)

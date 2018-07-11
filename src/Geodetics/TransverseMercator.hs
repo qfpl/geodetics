@@ -104,7 +104,7 @@ instance GridClass GridTM where
                
          aF0 = majorRadius (gridEllipsoid grid) * gridScale grid
          e2 = eccentricity2 $ gridEllipsoid grid
-         grid = gridBasis p
+         grid = p ^. gridBasis
          
    toGrid grid geo = applyOffset (off  `mappend` (offsetNegate $ falseOrigin grid)) $ 
                      GridPoint _0 _0 _0 grid
