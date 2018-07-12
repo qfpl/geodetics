@@ -26,8 +26,8 @@ import Data.Char(chr)
 import Data.Function((.))
 import Data.Maybe(listToMaybe)
 import Geodetics.Altitude(HasAltitude(altitude), groundPosition)
-import Geodetics.Latitude(HasLatitude(latitudeL))
-import Geodetics.Longitude(HasLongitude(longitudeL))
+import Geodetics.Latitude(HasLatitude(latitude))
+import Geodetics.Longitude(HasLongitude(longitude))
 import Geodetics.Ellipsoids
 import Geodetics.LatLongParser(latLong)
 import Linear.V3(V3(V3))
@@ -84,11 +84,11 @@ instance HasEllipsoid Geodetic where
       fmap (\x -> Geodetic lat' lon' alt' x) (k e)
 
 instance HasLatitude Geodetic where
-   latitudeL k (Geodetic lat' lon' alt' e) =
+   latitude k (Geodetic lat' lon' alt' e) =
       fmap (\x -> Geodetic x lon' alt' e) (k lat')
 
 instance HasLongitude Geodetic where
-  longitudeL k (Geodetic lat' lon' alt' e) =
+  longitude k (Geodetic lat' lon' alt' e) =
       fmap (\x -> Geodetic lat' x alt' e) (k lon')
 
 instance HasAltitude Geodetic where
@@ -97,8 +97,8 @@ instance HasAltitude Geodetic where
 
 instance Show Geodetic where
    show g = concat [
-      showAngle (abs $ (g ^. latitudeL)),  " ", letter "SN" (g ^. latitudeL),  ", ",
-      showAngle (abs $ (g ^. longitudeL)), " ", letter "WE" (g ^. longitudeL), ", ", 
+      showAngle (abs $ (g ^. latitude)),  " ", letter "SN" (g ^. latitude),  ", ",
+      showAngle (abs $ (g ^. longitude)), " ", letter "WE" (g ^. longitude), ", ", 
       show (g ^. altitude), " ", show (g ^. ellipsoid)]
       where letter s n = [s !! (if n < _0 then 0 else 1)]
 
@@ -150,8 +150,8 @@ showAngle a
 antipode :: HasGeodetic g => g -> Geodetic
 antipode g = Geodetic lat long (g ^. geodetic . altitude) (g ^. geodetic . ellipsoid)
    where
-      lat = negate $ (g ^. geodetic . latitudeL)
-      long' = (g ^. geodetic . longitudeL) - 180 *~ degree
+      lat = negate $ (g ^. geodetic . latitude)
+      long' = (g ^. geodetic . longitude) - 180 *~ degree
       long | long' < _0  = long' + 360 *~ degree
            | otherwise  = long' 
 
@@ -165,8 +165,8 @@ geoToEarth geo = V3 (
       ((n + h) * coslat * sinlong)
       ((n * (_1 - eccentricity2 e) + h) * sinlat)
    where 
-      geolat = geo ^. geodetic . latitudeL
-      geolon = geo ^. geodetic . longitudeL
+      geolat = geo ^. geodetic . latitude
+      geolon = geo ^. geodetic . longitude
       n = normal e $ geolat
       e = geo ^. geodetic . ellipsoid
       coslat = cos geolat
@@ -187,7 +187,7 @@ earthToGeo e (V3 x y z) = (phi, atan2 y x, sqrt (l ^ pos2 + p2) - norm)
    where
       -- Naming: numeric suffix indicates power. Hence x2 = x * x, x3 = x2 * x, etc.
       p2 = x ^ pos2 + y ^ pos2
-      a = majorRadius e
+      a = e ^. majorRadius 
       a2 = a ^ pos2
       e2 = eccentricity2 e
       e4 = e2 ^ pos2
@@ -212,7 +212,7 @@ toLocal e2 g = Geodetic lat lon alt e2
    where
       alt = g ^. altitude
       (lat, lon, _) = earthToGeo e2 $ applyHelmert h $ geoToEarth g
-      h = helmert (g ^. ellipsoid) `mappend` inverseHelmert (helmert e2)
+      h = (g ^. ellipsoid . helmert) `mappend` inverseHelmert (e2 ^. helmert)
 
 -- | Convert a position from any geodetic to WGS84, assuming local
 -- altitude stays constant.
@@ -221,7 +221,7 @@ toWGS84 g = Geodetic lat lon alt _WGS84
    where
       alt = g ^. altitude
       (lat, lon, _) = earthToGeo _WGS84 $ applyHelmert h $ geoToEarth g
-      h = helmert (g ^. ellipsoid)
+      h = g ^. ellipsoid . helmert
 
 
 -- | The absolute distance in a straight line between two geodetic 
@@ -278,11 +278,11 @@ groundDistance p1 p2 = do
   where
     p1ellipsoid = p1 ^. ellipsoid
     f = flattening p1ellipsoid
-    a = majorRadius p1ellipsoid
+    a = p1ellipsoid ^. majorRadius 
     b = minorRadius p1ellipsoid
-    l = abs $ (p1 ^. longitudeL) - (p2 ^. longitudeL)
-    u1 = atan ((_1-f) * tan (p1 ^. latitudeL))
-    u2 = atan ((_1-f) * tan (p2 ^. latitudeL))
+    l = abs $ (p1 ^. longitude) - (p2 ^. longitude)
+    u1 = atan ((_1-f) * tan (p1 ^. latitude))
+    u2 = atan ((_1-f) * tan (p2 ^. latitude))
     sinU1 = sin u1
     cosU1 = cos u1
     sinU2 = sin u2

@@ -8,8 +8,8 @@ import Control.Lens((^.))
 import Control.Monad(guard)
 import Geodetics.Ellipsoids
 import Geodetics.Geodetic(Geodetic(Geodetic), HasGeodetic(geodetic), earthToGeo, geoToEarth, properAngle)
-import Geodetics.Latitude(HasLatitude(latitudeL))
-import Geodetics.Longitude(HasLongitude(longitudeL))
+import Geodetics.Latitude(HasLatitude(latitude))
+import Geodetics.Longitude(HasLongitude(longitude))
 import Linear.V3(V3(V3))
 import Numeric.Units.Dimensional.Prelude
 
@@ -124,8 +124,8 @@ intersect d1 d2 accuracy n path1 path2
             sinB = sin b
             cosB = cos b
       mag3 (V3 x y z) = sqrt $ x*x + y*y + z*z
-      (nv1, gc1) = vectors (pt1 ^. latitudeL) (pt1 ^. longitudeL) h1
-      (nv2, gc2) = vectors (pt2 ^. latitudeL) (pt2 ^. longitudeL) h2
+      (nv1, gc1) = vectors (pt1 ^. latitude) (pt1 ^. longitude) h1
+      (nv2, gc2) = vectors (pt2 ^. latitude) (pt2 ^. longitude) h2
       nv3 = gc1 `cross3` gc2         -- Intersection of the great circles
       mag = mag3 nv3
       nv3a = scale3 nv3 (_1 / mag)   -- Scale to unit. See outer function for case when mag3 == 0
@@ -139,7 +139,7 @@ intersect d1 d2 accuracy n path1 path2
       gcDist norm v1 v2 = 
          let c = v1 `cross3` v2 
          in (if c `dot3` norm < _0 then negate else id) $ atan2 (mag3 c) (v1 `dot3` v2) 
-      r = majorRadius (pt1 ^. ellipsoid)
+      r = pt1 ^. ellipsoid. majorRadius 
           
 {- Note on derivation of "intersect"
 
@@ -202,7 +202,7 @@ rayPath pt1 bearing elevation = Path ray alwaysValid
             cosLat = cos lat
       
       direction = V3 (sinB*cosE) (cosB*cosE) sinE  -- Direction of ray in ENU
-      delta = transform3 (ecefMatrix (pt1 ^. geodetic . latitudeL) (pt1 ^. geodetic . longitudeL)) direction  -- Convert to ECEF
+      delta = transform3 (ecefMatrix (pt1 ^. geodetic . latitude) (pt1 ^. geodetic . longitude)) direction  -- Convert to ECEF
       pt1' = geoToEarth pt1    -- ECEF of origin point.
       sinB = sin bearing
       cosB = cos bearing
@@ -235,8 +235,8 @@ rhumbPath pt course = Path rhumb validity
                 | otherwise
                      = lon0 + distance * sinC / latitudeRadius (pt ^. geodetic . ellipsoid) ((lat0 + lat')/_2)
       validity
-         | cosC > _0  = ((negate pi/_2 - (pt ^. geodetic . latitudeL)) * b / cosC, (pi/_2 - (pt ^. geodetic . latitudeL)) * b / cosC)
-         | otherwise  = ((pi/_2 - (pt ^. geodetic . latitudeL)) * b / cosC, (negate pi/_2 - (pt ^. geodetic . latitudeL)) * b / cosC)
+         | cosC > _0  = ((negate pi/_2 - (pt ^. geodetic . latitude)) * b / cosC, (pi/_2 - (pt ^. geodetic . latitude)) * b / cosC)
+         | otherwise  = ((pi/_2 - (pt ^. geodetic . latitude)) * b / cosC, (negate pi/_2 - (pt ^. geodetic . latitude)) * b / cosC)
       q0 = q lat0
       q phi = log (tan (pi/_4+phi/_2)) + e * log ((_1-eSinPhi)/(_1+eSinPhi)) / _2
          where                                -- Factor out expression from Eq 16 of Kaplan
@@ -244,13 +244,13 @@ rhumbPath pt course = Path rhumb validity
       sinC = sin course
       cosC = cos course
       tanC = tan course
-      lat0 = (pt ^. geodetic . latitudeL)
-      lon0 = (pt ^. geodetic . longitudeL)
+      lat0 = (pt ^. geodetic . latitude)
+      lon0 = (pt ^. geodetic . longitude)
       ptellipsoid = pt ^. geodetic . ellipsoid
       e2 = eccentricity2 ptellipsoid
       e = sqrt e2
       m0 = meridianRadius ptellipsoid lat0
-      a = majorRadius ptellipsoid
+      a = ptellipsoid ^. majorRadius 
       b = minorRadius ptellipsoid
    
 
@@ -266,9 +266,9 @@ latitudePath pt = Path line alwaysValid
       line distance = (pt2, pi/_2, _0) 
          where
             pt2 = Geodetic 
-               (pt ^. geodetic . latitudeL) ((pt ^. geodetic . longitudeL) + distance / r)
+               (pt ^. geodetic . latitude) ((pt ^. geodetic . longitude) + distance / r)
                _0 (pt ^. geodetic . ellipsoid)
-      r = latitudeRadius (pt ^. geodetic . ellipsoid) (pt ^. geodetic . latitudeL)
+      r = latitudeRadius (pt ^. geodetic . ellipsoid) (pt ^. geodetic . latitude)
 
 
 -- | A path from the specified point to the North Pole. Use negative distances

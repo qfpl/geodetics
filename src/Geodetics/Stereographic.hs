@@ -19,8 +19,8 @@ import Geodetics.Ellipsoids
 import Geodetics.Geodetic(Geodetic(Geodetic), HasGeodetic(geodetic))
 import Geodetics.Grid(HasGridOffset(gridOffsetL), GridClass(gridEllipsoid), GridOffset, GridPoint(GridPoint), toGrid, fromGrid, applyOffset, offsetNegate, gridBasis)
 import Geodetics.GridScale(HasGridScale(gridScale))
-import Geodetics.Latitude(HasLatitude(latitudeL))
-import Geodetics.Longitude(HasLongitude(longitudeL))
+import Geodetics.Latitude(HasLatitude(latitude))
+import Geodetics.Longitude(HasLongitude(longitude))
 import Numeric.Units.Dimensional.Prelude
 
 
@@ -128,12 +128,12 @@ instance HasAltitude GridStereo where
       geodetic . altitude
 
 instance HasLatitude GridStereo where
-   latitudeL =
-      geodetic . latitudeL
+   latitude =
+      geodetic . latitude
 
 instance HasLongitude GridStereo where
-   longitudeL =
-      geodetic . longitudeL
+   longitude =
+      geodetic . longitude
 
 instance HasEllipsoid GridStereo where
    ellipsoid =
@@ -151,8 +151,8 @@ mkGridStereo tangent origin scale = GridStereo tangent origin scale r n c sinLat
       -- Here these will be called LatC0 and LatC1.
       ellipse = tangent ^. ellipsoid
       op :: Num a => Quantity d a -> Quantity d a    -- Values of longitude, tangent longitude, E and N
-      op = if tangent ^. latitudeL < _0 then negate else id  -- must be negated in the southern hemisphere.
-      lat0 = op $ (tangent ^. latitudeL)
+      op = if tangent ^. latitude < _0 then negate else id  -- must be negated in the southern hemisphere.
+      lat0 = op $ (tangent ^. latitude)
       sinLat0 = sin lat0
       e2 = eccentricity2 ellipse
       e = sqrt e2
@@ -174,16 +174,16 @@ instance GridClass GridStereo where
    toGrid grid geo = applyOffset (grid ^. gridOffsetL) $ GridPoint east north (geo ^. altitude) grid
       where
          op :: Num a => Quantity d a -> Quantity d a    -- Values of longitude, tangent longitude, E and N
-         op = if (grid ^. latitudeL) < _0 then negate else id  -- must be negated in the southern hemisphere.
+         op = if (grid ^. latitude) < _0 then negate else id  -- must be negated in the southern hemisphere.
          sinLatC = (w - _1)/(w + _1)
          cosLatC = sqrt $ _1 - sinLatC * sinLatC
-         longC = (grid ^. gridNL) * (op (geo ^. longitudeL) - long0) + long0
+         longC = (grid ^. gridNL) * (op (geo ^. longitude) - long0) + long0
          w = (grid ^. gridCL) * (sA * sB ** e) ** (grid ^. gridNL)
          sA = (_1+sinLat) / (_1 - sinLat)
          sB = (_1 - e*sinLat) / (_1 + e*sinLat)
-         sinLat = sin $ op $ (geo ^. latitudeL)
+         sinLat = sin $ op $ (geo ^. latitude)
          e = sqrt $ eccentricity2 $ (geo ^. ellipsoid)
-         long0 = op $ (grid ^. longitudeL)
+         long0 = op $ (grid ^. longitude)
          b = _1 + sinLatC * (grid ^. gridSinL) + cosLatC * (grid ^. gridCosL) * cos (longC - long0)
          east = _2 * (grid ^. gridRL) * (grid ^. gridScale) * cosLatC * sin (longC - long0) / b
          north = _2 * (grid ^. gridRL) * (grid ^. gridScale) * (sinLatC * (grid ^. gridCosL) - cosLatC * (grid ^. gridSinL) * cos (longC - long0)) / b
@@ -197,12 +197,12 @@ instance GridClass GridStereo where
          Geodetic (op latN) (op long) height $ gridEllipsoid grid
       where
          op :: Num a => Quantity d a -> Quantity d a                   -- Values of longitude, tangent longitude, E and N
-         op = if (grid ^. latitudeL) < _0 then negate else id  -- must be negated in the southern hemisphere.
+         op = if (grid ^. latitude) < _0 then negate else id  -- must be negated in the southern hemisphere.
          GridPoint east north height _ = applyOffset (offsetNegate $ grid ^. gridOffsetL) gp
          east' = east
          north' = north
          grid = gp ^. gridBasis
-         long0 = op (grid ^. longitudeL)
+         long0 = op (grid ^. longitude)
          i = atan2 east' ((grid ^. gridHL) + north')
          j = atan2 east' ((grid ^. gridGL) - north') - i
          latC = (grid ^. gridLatCL) + _2 * atan2 (north' - east' * tan (j/_2)) (_2 * (grid ^. gridRL) * (grid ^. gridScale))

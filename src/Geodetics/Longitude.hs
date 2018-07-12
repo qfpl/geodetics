@@ -11,9 +11,9 @@ import Numeric.Units.Dimensional.Prelude(Angle)
 import Prelude(Double)
 
 class HasLongitude a where
-  longitudeL ::
+  longitude ::
     Lens' a (Angle Double)
 
 instance HasLongitude (Angle Double) where
-  longitudeL =
+  longitude =
     id

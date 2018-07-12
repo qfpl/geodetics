@@ -13,8 +13,8 @@ import Geodetics.Ellipsoids
 import Geodetics.Geodetic(HasGeodetic(geodetic), Geodetic(Geodetic))
 import Geodetics.Grid(HasGridOffset(gridOffsetL), GridClass(gridEllipsoid), GridOffset(GridOffset), GridPoint(GridPoint), fromGrid, toGrid, applyOffset, gridBasis, offsetNegate)
 import Geodetics.GridScale(HasGridScale(gridScale))
-import Geodetics.Latitude(HasLatitude(latitudeL))
-import Geodetics.Longitude(HasLongitude(longitudeL))
+import Geodetics.Latitude(HasLatitude(latitude))
+import Geodetics.Longitude(HasLongitude(longitude))
 import Numeric.Units.Dimensional.Prelude hiding ((.), id)
 import Prelude ()
 
@@ -91,12 +91,12 @@ instance HasGridOffset GridTM where
     fmap (\x -> GridTM t x s n1 n2 n3 n4) (k f)
 
 instance HasLatitude GridTM where
-  latitudeL =
-    geodetic . latitudeL
+  latitude =
+    geodetic . latitude
 
 instance HasLongitude GridTM where
-  longitudeL =
-    geodetic . longitudeL
+  longitude =
+    geodetic . longitude
 
 instance HasAltitude GridTM where
   altitude =
@@ -134,8 +134,8 @@ m grid lat = bF0 * (grid ^. gridN1 * dLat
                     + grid ^. gridN3 * sin (_2 * dLat) * cos (_2 * sLat) 
                     - grid ^. gridN4 * sin (_3 * dLat) * cos (_3 * sLat))
    where
-      dLat = lat - (grid ^. geodetic . latitudeL)
-      sLat = lat + (grid ^. geodetic . latitudeL)
+      dLat = lat - (grid ^. geodetic . latitude)
+      sLat = lat + (grid ^. geodetic . latitude)
       bF0 = minorRadius (gridEllipsoid grid) * (grid ^. gridScale)
 
 
@@ -146,7 +146,7 @@ instance GridClass GridTM where
                            * (_5 + _3 * tanLat ^ pos2 + eta2 - _9 * tanLat ^ pos2 * eta2)  -- Term VIII
             - east' * east' ^ pos5 * (tanLat / ((720 *~ one) * rho * v ^ pos5))
                            * (61 *~ one + (90 *~ one) * tanLat ^ pos2 + (45 *~ one) * tanLat ^ pos4)) -- Term IX
-      ((grid ^. geodetic . longitudeL) 
+      ((grid ^. geodetic . longitude) 
             + east' / (cosLat * v)  -- Term X
             - (east' ^ pos3 / (_6 * cosLat * v ^ pos3)) * (v / rho + _2 * tanLat ^ pos2)  -- Term XI
             + (east' ^ pos5 / ((120 *~ one) * cosLat * v ^ pos5)) 
@@ -159,7 +159,7 @@ instance GridClass GridTM where
       where
          GridPoint east' north' _ _ = (grid ^. gridOffsetL) `applyOffset` p
          lat' = fst $ head $ dropWhile ((> 0.01 *~ milli meter) . snd) 
-               $ tail $ iterate next (grid ^. geodetic . latitudeL, 1 *~ meter) 
+               $ tail $ iterate next (grid ^. geodetic . latitude, 1 *~ meter) 
             where
                next (phi, _) = let delta = north' - m grid phi in (phi + delta / aF0, delta) 
                -- head and tail are safe because iterate returns an infinite list.
@@ -173,7 +173,7 @@ instance GridClass GridTM where
          eta2 = v / rho - _1
                
                
-         aF0 = majorRadius (gridEllipsoid grid) * (grid ^. gridScale)
+         aF0 = (gridEllipsoid grid ^. majorRadius ) * (grid ^. gridScale)
          e2 = eccentricity2 $ gridEllipsoid grid
          grid = p ^. gridBasis
          
@@ -219,14 +219,14 @@ instance GridClass GridTM where
             "VI   = ", show term_VI, "\n"]
          -}
          -- Common subexpressions
-         lat = geo ^. latitudeL
-         long = geo ^. longitudeL
-         dLong = long - (grid ^. geodetic . longitudeL)
+         lat = geo ^. latitude
+         long = geo ^. longitude
+         dLong = long - (grid ^. geodetic . longitude)
          sinLat = sin lat
          cosLat = cos lat
          tanLat = tan lat
          sinLat2 = sinLat ^ pos2
-         aF0 = (majorRadius $ gridEllipsoid grid) * (grid ^. gridScale)
+         aF0 = (gridEllipsoid grid ^. majorRadius) * (grid ^. gridScale)
          e2 = eccentricity2 $ gridEllipsoid grid
    
    gridEllipsoid = (^. ellipsoid) . (^. geodetic)

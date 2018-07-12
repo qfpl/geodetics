@@ -139,9 +139,9 @@ instance Arbitrary Helmert where
          ((*~ one) <$> choose (-5,10)) <*>
          genSeconds <*> genSeconds <*> genSeconds
    shrink h = 
-      tail $ Helmert <$> shrinkLength (h ^. cXL) <*> shrinkLength (h ^. cYL) <*> shrinkLength (h ^. cZL) <*>
-         shrinkUnit (h ^. helmertScaleL) <*>
-         shrinkUnit (h ^. rXL) <*> shrinkUnit (h ^. rYL) <*> shrinkUnit (h ^. rZL)      
+      tail $ Helmert <$> shrinkLength (h ^. cX) <*> shrinkLength (h ^. cY) <*> shrinkLength (h ^. cZ) <*>
+         shrinkUnit (h ^. helmertScale) <*>
+         shrinkUnit (h ^. rX) <*> shrinkUnit (h ^. rY) <*> shrinkUnit (h ^. rZ)
 
 instance Arbitrary Ellipsoid where
    arbitrary =
@@ -149,8 +149,7 @@ instance Arbitrary Ellipsoid where
          ((*~ meter) <$> choose (6378100, 6378400)) <*>                  -- majorRadius
          ((*~ one) <$> choose (297,300)) <*>                             -- flatR
          arbitrary                                                       -- helmert
-   shrink e = tail $ Ellipsoid (majorRadius e) (flatR e) <$> shrink' (helmert e)
-
+   shrink e = tail $ Ellipsoid (e ^. majorRadius) (e ^. flatR) <$> shrink' (e ^. helmert)
         
 instance Arbitrary Geodetic where
    arbitrary = 
@@ -158,8 +157,8 @@ instance Arbitrary Geodetic where
    shrink g = 
       tail $
          Geodetic <$>
-         shrinkAngle (g ^. latitudeL) <*>
-         shrinkAngle (g ^. longitudeL) <*> 
+         shrinkAngle (g ^. latitude) <*>
+         shrinkAngle (g ^. longitude) <*> 
          shrinkLength (g ^. altitude) <*>
          shrink' (g ^. ellipsoid)
 
@@ -238,7 +237,7 @@ instance Show RhumbPaths2 where
           
 instance Arbitrary RhumbPaths2 where
    arbitrary = RP2 
-      <$> arbitrary `suchThat` ((< 70 *~ degree) . abs . (^. latitudeL))
+      <$> arbitrary `suchThat` ((< 70 *~ degree) . abs . (^. latitude))
       <*> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary
    shrink rp = 
       tail $ RP2 <$> 
