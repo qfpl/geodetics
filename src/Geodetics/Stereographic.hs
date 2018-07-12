@@ -26,9 +26,9 @@ import Numeric.Units.Dimensional.Prelude
 
 -- | A stereographic projection with its origin at an arbitrary point on Earth, other than the poles.
 data GridStereo = GridStereo
-      Geodetic -- ^ Point where the plane of projection touches the ellipsoid. Often known as the Natural Origin.
-      GridOffset  -- ^ Grid position of the tangent point. Often known as the False Origin.
-      (Dimensionless Double) -- ^ Scaling factor that balances the distortion between the center and the edges. 
+      Geodetic -- Point where the plane of projection touches the ellipsoid. Often known as the Natural Origin.
+      GridOffset  -- Grid position of the tangent point. Often known as the False Origin.
+      (Dimensionless Double) -- Scaling factor that balances the distortion between the center and the edges. 
                                          -- Should be slightly less than unity.
       
       -- Memoised parameters derived from the tangent point.

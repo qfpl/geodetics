@@ -112,7 +112,7 @@ data Helmert = Helmert
    (Length Double)
    (Length Double)
    (Length Double)
-   (Dimensionless Double)  -- ^ Parts per million
+   (Dimensionless Double)  -- Parts per million
    (Dimensionless Double)
    (Dimensionless Double)
    (Dimensionless Double)

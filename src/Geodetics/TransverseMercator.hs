@@ -23,12 +23,12 @@ import Prelude ()
 -- a slightly elliptical cylinder).
 data GridTM = GridTM
    Geodetic
-      -- ^ A point on the line where the projection touches the ellipsoid (altitude is ignored).
+      -- A point on the line where the projection touches the ellipsoid (altitude is ignored).
    GridOffset
-      -- ^ The grid position of the true origin. Used to avoid negative coordinates over 
+      -- The grid position of the true origin. Used to avoid negative coordinates over 
       -- the area of interest. The altitude gives a vertical offset from the ellipsoid.
    (Dimensionless Double)
-      -- ^ A scaling factor that balances the distortion between the east & west edges and the middle 
+      -- A scaling factor that balances the distortion between the east & west edges and the middle 
       -- of the projection.
       
    -- Remaining elements are memoised parameters computed from the ellipsoid underlying the true origin.
