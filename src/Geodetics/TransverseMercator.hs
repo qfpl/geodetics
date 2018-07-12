@@ -11,7 +11,7 @@ import Data.Function((.), id)
 import Geodetics.Altitude(HasAltitude(altitude))
 import Geodetics.Ellipsoids
 import Geodetics.Geodetic(HasGeodetic(geodetic), Geodetic(Geodetic))
-import Geodetics.Grid(HasGridOffset(gridOffsetL), GridClass(gridEllipsoid), GridOffset(GridOffset), GridPoint(GridPoint), fromGrid, toGrid, applyOffset, gridBasis, offsetNegate)
+import Geodetics.Grid(HasGridOffset(gridOffsetL), GridClass(gridTRF), GridOffset(GridOffset), GridPoint(GridPoint), fromGrid, toGrid, applyOffset, gridBasis, offsetNegate)
 import Geodetics.GridScale(HasGridScale(gridScale))
 import Geodetics.Latitude(HasLatitude(latitude))
 import Geodetics.Longitude(HasLongitude(longitude))
@@ -102,9 +102,9 @@ instance HasAltitude GridTM where
   altitude =
     geodetic . altitude
 
-instance HasEllipsoid GridTM where
-  ellipsoid =
-    geodetic . ellipsoid
+instance HasTRF GridTM where
+  trf =
+    geodetic . trf
 
 -- | Create a Transverse Mercator grid.
 mkGridTM :: 
@@ -121,7 +121,7 @@ mkGridTM origin offset sf =
            (((15*~one)/_8) * (n^pos2 + n^pos3))
            (((35*~one)/(24*~one)) * n^pos3)
     where 
-       f = flattening (origin ^. ellipsoid)
+       f = flattening (origin ^. trf)
        n = f / (_2-f)  -- Equivalent to (a-b)/(a+b) where b = (1-f)*a
 
 
@@ -136,7 +136,7 @@ m grid lat = bF0 * (grid ^. gridN1 * dLat
    where
       dLat = lat - (grid ^. geodetic . latitude)
       sLat = lat + (grid ^. geodetic . latitude)
-      bF0 = minorRadius (gridEllipsoid grid) * (grid ^. gridScale)
+      bF0 = minorRadius (gridTRF grid) * (grid ^. gridScale)
 
 
 instance GridClass GridTM where
@@ -153,7 +153,7 @@ instance GridClass GridTM where
                  * (_5 + (28 *~ one) * tanLat ^ pos2  + (24 *~ one) * tanLat ^ pos4)  -- Term XII
             - (east' ^ pos5 * east' ^ pos2 / ((5040 *~ one) * cosLat * v * v * v ^ pos5))
                  * ((61 *~ one) + (662 *~ one) * tanLat ^ pos2 + (1320 *~ one) * tanLat ^ pos4 + (720 *~ one) * tanLat * tanLat ^ pos5)) -- Term XIIa
-     (0 *~ meter) (gridEllipsoid grid)
+     (0 *~ meter) (gridTRF grid)
             
             
       where
@@ -173,8 +173,8 @@ instance GridClass GridTM where
          eta2 = v / rho - _1
                
                
-         aF0 = (gridEllipsoid grid ^. majorRadius ) * (grid ^. gridScale)
-         e2 = eccentricity2 $ gridEllipsoid grid
+         aF0 = (gridTRF grid ^. majorRadius ) * (grid ^. gridScale)
+         e2 = eccentricity2 $ gridTRF grid
          grid = p ^. gridBasis
          
    toGrid grid geo = applyOffset (off  `mappend` (offsetNegate (grid ^. gridOffsetL))) $ 
@@ -226,7 +226,7 @@ instance GridClass GridTM where
          cosLat = cos lat
          tanLat = tan lat
          sinLat2 = sinLat ^ pos2
-         aF0 = (gridEllipsoid grid ^. majorRadius) * (grid ^. gridScale)
-         e2 = eccentricity2 $ gridEllipsoid grid
+         aF0 = (gridTRF grid ^. majorRadius) * (grid ^. gridScale)
+         e2 = eccentricity2 $ gridTRF grid
    
-   gridEllipsoid = (^. ellipsoid) . (^. geodetic)
+   gridTRF = (^. geodetic . trf)

@@ -139,7 +139,7 @@ intersect d1 d2 accuracy n path1 path2
       gcDist norm v1 v2 = 
          let c = v1 `cross3` v2 
          in (if c `dot3` norm < _0 then negate else id) $ atan2 (mag3 c) (v1 `dot3` v2) 
-      r = pt1 ^. ellipsoid. majorRadius 
+      r = pt1 ^. trf . majorRadius 
           
 {- Note on derivation of "intersect"
 
@@ -179,10 +179,10 @@ rayPath ::
    -> Path
 rayPath pt1 bearing elevation = Path ray alwaysValid
    where
-      ray distance = (Geodetic lat long alt (pt1 ^. geodetic . ellipsoid), bearing2, elevation2)
+      ray distance = (Geodetic lat long alt (pt1 ^. geodetic . trf), bearing2, elevation2)
          where
             pt2' = pt1' `add3` (delta `scale3` distance)      -- ECEF of result point.
-            (lat, long, alt) = earthToGeo (pt1 ^. geodetic . ellipsoid) pt2'  -- Geodetic of result point.
+            (lat, long, alt) = earthToGeo (pt1 ^. geodetic . trf) pt2'  -- Geodetic of result point.
             (V3 dE dN dU) = transform3 (trans3 $ ecefMatrix lat long) delta  -- Direction of ray at result point.
             elevation2 = asin dU
             bearing2 = if dE == _0 && dN == _0 then bearing else atan2 dE dN  -- Allow for vertical elevation.
@@ -225,7 +225,7 @@ rhumbPath ::
    -> Path
 rhumbPath pt course = Path rhumb validity
    where
-      rhumb distance = (Geodetic lat (properAngle lon) _0 (pt ^. geodetic . ellipsoid), course, _0)
+      rhumb distance = (Geodetic lat (properAngle lon) _0 (pt ^. geodetic . trf), course, _0)
          where
             lat' = lat0 + distance * cosC / m0   -- Kaplan Eq 13.
             lat = lat0 + (m0 / (a*(_1-e2))) * ((_1-_3*e2/_4)*(lat'-lat0)
@@ -233,7 +233,7 @@ rhumbPath pt course = Path rhumb validity
             lon | abs cosC > 1e-7 *~ one 
                      = lon0 + tanC * (q lat - q0)     -- Kaplan Eq 16.
                 | otherwise
-                     = lon0 + distance * sinC / latitudeRadius (pt ^. geodetic . ellipsoid) ((lat0 + lat')/_2)
+                     = lon0 + distance * sinC / latitudeRadius (pt ^. geodetic . trf) ((lat0 + lat')/_2)
       validity
          | cosC > _0  = ((negate pi/_2 - (pt ^. geodetic . latitude)) * b / cosC, (pi/_2 - (pt ^. geodetic . latitude)) * b / cosC)
          | otherwise  = ((pi/_2 - (pt ^. geodetic . latitude)) * b / cosC, (negate pi/_2 - (pt ^. geodetic . latitude)) * b / cosC)
@@ -246,7 +246,7 @@ rhumbPath pt course = Path rhumb validity
       tanC = tan course
       lat0 = (pt ^. geodetic . latitude)
       lon0 = (pt ^. geodetic . longitude)
-      ptellipsoid = pt ^. geodetic . ellipsoid
+      ptellipsoid = pt ^. geodetic . trf
       e2 = eccentricity2 ptellipsoid
       e = sqrt e2
       m0 = meridianRadius ptellipsoid lat0
@@ -267,8 +267,8 @@ latitudePath pt = Path line alwaysValid
          where
             pt2 = Geodetic 
                (pt ^. geodetic . latitude) ((pt ^. geodetic . longitude) + distance / r)
-               _0 (pt ^. geodetic . ellipsoid)
-      r = latitudeRadius (pt ^. geodetic . ellipsoid) (pt ^. geodetic . latitude)
+               _0 (pt ^. geodetic . trf)
+      r = latitudeRadius (pt ^. geodetic . trf) (pt ^. geodetic . latitude)
 
 
 -- | A path from the specified point to the North Pole. Use negative distances

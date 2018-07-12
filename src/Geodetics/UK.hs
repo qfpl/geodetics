@@ -16,7 +16,7 @@ import Control.Monad(guard)
 import Data.Array(Array, inRange, (!), listArray)
 import Data.Char(ord)
 import Geodetics.Geodetic(Geodetic(Geodetic))
-import Geodetics.Grid(GridClass, GridOffset(GridOffset), GridPoint(GridPoint), toGrid, fromGrid, gridEllipsoid, unsafeGridCoerce, fromGridDigits, applyOffset, toGridDigits, eastings, northings)
+import Geodetics.Grid(GridClass, GridOffset(GridOffset), GridPoint(GridPoint), toGrid, fromGrid, gridTRF, unsafeGridCoerce, fromGridDigits, applyOffset, toGridDigits, eastings, northings)
 import Geodetics.Ellipsoids
 import Geodetics.TransverseMercator(GridTM, mkGridTM)
 import Numeric.Units.Dimensional.Prelude
@@ -24,7 +24,7 @@ import qualified Prelude as P((-))
 
 
 
--- | Ellipsoid definition for Great Britain. Airy 1830 offset from the centre of the Earth 
+-- | TRF definition for Great Britain. Airy 1830 offset from the centre of the Earth 
 -- and rotated slightly.
 -- 
 -- The Helmert parameters are from the Ordnance Survey document 
@@ -33,9 +33,9 @@ import qualified Prelude as P((-))
 -- requiring greater accuracy.  A more precise conversion requires a large table 
 -- of corrections for historical inaccuracies in the triangulation of the UK.
 _OSGB36 ::
-  Ellipsoid
+  TRF
 _OSGB36 =
-   Ellipsoid
+   TRF
      (6377563.396 *~ meter)
      (299.3249646 *~ one)
      (Helmert 
@@ -51,7 +51,7 @@ data UkNationalGrid = UkNationalGrid deriving (Eq, Show)
 instance GridClass UkNationalGrid where
    toGrid _ = unsafeGridCoerce UkNationalGrid . toGrid ukGrid
    fromGrid = fromGrid . unsafeGridCoerce ukGrid
-   gridEllipsoid _ = _OSGB36
+   gridTRF _ = _OSGB36
 
 
 ukTrueOrigin :: Geodetic

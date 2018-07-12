@@ -31,7 +31,7 @@ import Data.Monoid (Monoid)
 import Data.Semigroup (Semigroup, (<>))
 import Geodetics.Altitude(HasAltitude(altitude))
 import Geodetics.Geodetic(Geodetic)
-import Geodetics.Ellipsoids(Ellipsoid)
+import Geodetics.Ellipsoids(TRF)
 import Numeric.Units.Dimensional.Prelude hiding ((.))
 import qualified Prelude as P
 
@@ -44,7 +44,7 @@ import qualified Prelude as P
 class GridClass r where
    fromGrid :: GridPoint r -> Geodetic
    toGrid :: r -> Geodetic -> GridPoint r
-   gridEllipsoid :: r -> Ellipsoid
+   gridTRF :: r -> TRF
 
 
 -- | A point on the specified grid. 

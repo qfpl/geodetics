@@ -143,13 +143,13 @@ instance Arbitrary Helmert where
          shrinkUnit (h ^. helmertScale) <*>
          shrinkUnit (h ^. rX) <*> shrinkUnit (h ^. rY) <*> shrinkUnit (h ^. rZ)
 
-instance Arbitrary Ellipsoid where
+instance Arbitrary TRF where
    arbitrary =
-      Ellipsoid <$>
+      TRF <$>
          ((*~ meter) <$> choose (6378100, 6378400)) <*>                  -- majorRadius
          ((*~ one) <$> choose (297,300)) <*>                             -- flatR
          arbitrary                                                       -- helmert
-   shrink e = tail $ Ellipsoid (e ^. majorRadius) (e ^. flatR) <$> shrink' (e ^. helmert)
+   shrink e = tail $ TRF (e ^. majorRadius) (e ^. flatR) <$> shrink' (e ^. helmert)
         
 instance Arbitrary Geodetic where
    arbitrary = 
@@ -160,7 +160,7 @@ instance Arbitrary Geodetic where
          shrinkAngle (g ^. latitude) <*>
          shrinkAngle (g ^. longitude) <*> 
          shrinkLength (g ^. altitude) <*>
-         shrink' (g ^. ellipsoid)
+         shrink' (g ^. trf)
 
 instance Arbitrary (GridPoint GridTM) where
    arbitrary = GridPoint <$> genOffset 100000 <*> genOffset 100000 <*> genOffset 1 <*> arbitrary

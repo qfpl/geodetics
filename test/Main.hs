@@ -130,7 +130,7 @@ dms d m s = fromIntegral d *~ degree + fromIntegral m *~ arcminute + s *~ arcsec
 
 -- | Round-trip from local to WGS84 and back is identity (approximately)
 prop_WGS84_and_back :: Geodetic -> Bool
-prop_WGS84_and_back p = samePlace p $ toLocal (p ^. ellipsoid) $ toWGS84 p
+prop_WGS84_and_back p = samePlace p $ toLocal (p ^. trf) $ toWGS84 p
 
 
 -- | Sample pairs of points with bearings and distances. 
@@ -274,7 +274,7 @@ ukTest = Geodetic (dms 52 39 27.2531) (dms 1 43 4.5177) (0 *~ meter) _OSGB36
 stereoGridN :: GridStereo
 stereoGridN = mkGridStereo tangent origin (0.9999079 *~ one)
    where
-      ellipse = Ellipsoid (6377397.155 *~ metre) (299.15281 *~ one) mempty
+      ellipse = TRF (6377397.155 *~ metre) (299.15281 *~ one) mempty
       tangent = Geodetic (dms 52 9 22.178) (dms 5 23 15.500) (0 *~ meter) ellipse
       origin = GridOffset (155000 *~ metre) (463000 *~ metre) (0 *~ meter)
       
@@ -285,7 +285,7 @@ stereoGridN = mkGridStereo tangent origin (0.9999079 *~ one)
 stereoGridS :: GridStereo
 stereoGridS = mkGridStereo tangent origin (0.9999079 *~ one)
    where
-      ellipse = Ellipsoid (6377397.155 *~ metre) (299.15281 *~ one) mempty
+      ellipse = TRF (6377397.155 *~ metre) (299.15281 *~ one) mempty
       tangent = Geodetic (negate $ dms 52 9 22.178) (dms 5 23 15.500) (0 *~ meter) ellipse
       origin = GridOffset ((-155000) *~ metre) (463000 *~ metre) (0 *~ meter)
 
@@ -295,14 +295,14 @@ stereoGridS = mkGridStereo tangent origin (0.9999079 *~ one)
 stereographicToGridN :: Bool
 stereographicToGridN = sameGrid g1 g1'
    where
-      p1 = Geodetic (dms 53 0 0) (dms 6 0 0) (0 *~ meter) $ gridEllipsoid stereoGridN 
+      p1 = Geodetic (dms 53 0 0) (dms 6 0 0) (0 *~ meter) $ gridTRF stereoGridN 
       g1 = GridPoint (196105.283 *~ meter) (557057.739 *~ meter) (0 *~ meter) stereoGridN
       g1' = toGrid stereoGridN p1
 
 stereographicFromGridN :: Bool
 stereographicFromGridN = samePlace p1 p1'
    where
-      p1 = Geodetic (dms 53 0 0) (dms 6 0 0) (0 *~ meter) $ gridEllipsoid stereoGridN
+      p1 = Geodetic (dms 53 0 0) (dms 6 0 0) (0 *~ meter) $ gridTRF stereoGridN
       g1 = GridPoint (196105.283 *~ meter) (557057.739 *~ meter) (0 *~ meter) stereoGridN
       p1' = fromGrid g1      
 
@@ -310,7 +310,7 @@ stereographicFromGridN = samePlace p1 p1'
 stereographicToGridS :: Bool
 stereographicToGridS = sameGrid g1 g1'
    where
-      p1 = Geodetic (negate $ dms 53 0 0) (dms 6 0 0) (0 *~ meter) $ gridEllipsoid stereoGridS
+      p1 = Geodetic (negate $ dms 53 0 0) (dms 6 0 0) (0 *~ meter) $ gridTRF stereoGridS
       g1 = GridPoint ((-196105.283) *~ meter) (557057.739 *~ meter) (0 *~ meter) stereoGridS
       g1' = toGrid stereoGridS p1
 
@@ -318,7 +318,7 @@ stereographicToGridS = sameGrid g1 g1'
 stereographicFromGridS :: Bool
 stereographicFromGridS = samePlace p1 p1'
    where
-      p1 = Geodetic (negate $ dms 53 0 0) (dms 6 0 0) (0 *~ meter) $ gridEllipsoid stereoGridS
+      p1 = Geodetic (negate $ dms 53 0 0) (dms 6 0 0) (0 *~ meter) $ gridTRF stereoGridS
       g1 = GridPoint ((-196105.283) *~ meter) (557057.739 *~ meter) (0 *~ meter) stereoGridS
       p1' = fromGrid g1 
 

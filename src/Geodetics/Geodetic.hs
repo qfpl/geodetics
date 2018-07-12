@@ -69,7 +69,7 @@ data Geodetic =
      (Angle Double)
      (Angle Double)
      (Length Double)
-     Ellipsoid
+     TRF
 
 class HasGeodetic a where
    geodetic ::
@@ -79,8 +79,8 @@ instance HasGeodetic Geodetic where
    geodetic =
       id
 
-instance HasEllipsoid Geodetic where
-   ellipsoid k (Geodetic lat' lon' alt' e) =
+instance HasTRF Geodetic where
+   trf k (Geodetic lat' lon' alt' e) =
       fmap (\x -> Geodetic lat' lon' alt' x) (k e)
 
 instance HasLatitude Geodetic where
@@ -99,7 +99,7 @@ instance Show Geodetic where
    show g = concat [
       showAngle (abs $ (g ^. latitude)),  " ", letter "SN" (g ^. latitude),  ", ",
       showAngle (abs $ (g ^. longitude)), " ", letter "WE" (g ^. longitude), ", ", 
-      show (g ^. altitude), " ", show (g ^. ellipsoid)]
+      show (g ^. altitude), " ", show (g ^. trf)]
       where letter s n = [s !! (if n < _0 then 0 else 1)]
 
 
@@ -120,7 +120,7 @@ instance Show Geodetic where
 -- * Degrees, minutes and seconds (units optional): 34° 31' 23.52\" N, 46° 13' 56.43\" W 
 -- 
 -- * DDDMMSS format with optional leading zeros: 343123.52N, 0461356.43W
-readGroundPosition :: Ellipsoid -> String -> Maybe Geodetic
+readGroundPosition :: TRF -> String -> Maybe Geodetic
 readGroundPosition e str = 
    case map fst . filter (null . snd) $ readP_to_S latLong str of
       [] -> Nothing
@@ -148,7 +148,7 @@ showAngle a
 -- | The point on the Earth diametrically opposite the argument, with
 -- the same altitude.
 antipode :: HasGeodetic g => g -> Geodetic
-antipode g = Geodetic lat long (g ^. geodetic . altitude) (g ^. geodetic . ellipsoid)
+antipode g = Geodetic lat long (g ^. geodetic . altitude) (g ^. geodetic . trf)
    where
       lat = negate $ (g ^. geodetic . latitude)
       long' = (g ^. geodetic . longitude) - 180 *~ degree
@@ -168,7 +168,7 @@ geoToEarth geo = V3 (
       geolat = geo ^. geodetic . latitude
       geolon = geo ^. geodetic . longitude
       n = normal e $ geolat
-      e = geo ^. geodetic . ellipsoid
+      e = geo ^. geodetic . trf
       coslat = cos geolat
       coslong = cos geolon
       sinlat = sin geolat
@@ -182,7 +182,7 @@ geoToEarth geo = V3 (
 -- Uses the closed form solution of H. Vermeille: Direct
 -- transformation from geocentric coordinates to geodetic coordinates.
 -- Journal of Geodesy Volume 76, Number 8 (2002), 451-454
-earthToGeo :: HasEllipsoid e => e -> ECEF -> (Angle Double, Angle Double, Length Double)
+earthToGeo :: HasTRF e => e -> ECEF -> (Angle Double, Angle Double, Length Double)
 earthToGeo e (V3 x y z) = (phi, atan2 y x, sqrt (l ^ pos2 + p2) - norm)
    where
       -- Naming: numeric suffix indicates power. Hence x2 = x * x, x3 = x2 * x, etc.
@@ -207,12 +207,12 @@ earthToGeo e (V3 x y z) = (phi, atan2 y x, sqrt (l ^ pos2 + p2) - norm)
 
 
 -- | Convert a position from any geodetic to another one, assuming local altitude stays constant.
-toLocal :: Ellipsoid -> Geodetic -> Geodetic
+toLocal :: TRF -> Geodetic -> Geodetic
 toLocal e2 g = Geodetic lat lon alt e2
    where
       alt = g ^. altitude
       (lat, lon, _) = earthToGeo e2 $ applyHelmert h $ geoToEarth g
-      h = (g ^. ellipsoid . helmert) `mappend` inverseHelmert (e2 ^. helmert)
+      h = (g ^. trf . helmert) `mappend` inverseHelmert (e2 ^. helmert)
 
 -- | Convert a position from any geodetic to WGS84, assuming local
 -- altitude stays constant.
@@ -221,7 +221,7 @@ toWGS84 g = Geodetic lat lon alt _WGS84
    where
       alt = g ^. altitude
       (lat, lon, _) = earthToGeo _WGS84 $ applyHelmert h $ geoToEarth g
-      h = g ^. ellipsoid . helmert
+      h = g ^. trf . helmert
 
 
 -- | The absolute distance in a straight line between two geodetic 
@@ -276,7 +276,7 @@ groundDistance p1 p2 = do
        alpha2 = atan2(cosU1 * sin lambda) (cosU1 * sinU2 * cos lambda - sinU1 * cosU2)
      return (s, alpha1, alpha2)
   where
-    p1ellipsoid = p1 ^. ellipsoid
+    p1ellipsoid = p1 ^. trf
     f = flattening p1ellipsoid
     a = p1ellipsoid ^. majorRadius 
     b = minorRadius p1ellipsoid

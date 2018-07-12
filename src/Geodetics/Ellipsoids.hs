@@ -1,7 +1,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE FlexibleContexts, TypeOperators, TypeFamilies #-}
 
-{- | An Ellipsoid is a reasonable best fit for the surface of the 
+{- | An TRF is a reasonable best fit for the surface of the 
 Earth over some defined area. WGS84 is the standard used for the whole
 of the Earth. Other Ellipsoids are considered a best fit for some
 specific area.
@@ -14,9 +14,9 @@ module Geodetics.Ellipsoids (
    inverseHelmert,
    ECEF,
    applyHelmert,
-   -- ** Ellipsoid models of the Geoid
-   Ellipsoid (..),
-   HasEllipsoid(..),
+   -- ** TRF models of the Geoid
+   TRF (..),
+   HasTRF(..),
    helmertFromWSG84,
    helmertToWSG84,
    _WGS84,
@@ -261,7 +261,7 @@ applyHelmert h (V3 x y z) = V3 (
       s = _1 + helmertScaleX h * (1e-6 *~ one)
 
 
--- | An Ellipsoid is defined by the major radius and the inverse flattening (which define its shape), 
+-- | An TRF is defined by the major radius and the inverse flattening (which define its shape), 
 -- and its Helmert transform relative to WGS84 (which defines its position and orientation).
 --
 -- The inclusion of the Helmert parameters relative to WGS84 actually make this a Terrestrial 
@@ -273,16 +273,16 @@ applyHelmert h (V3 x y z) = V3 (
 -- 
 -- > helmertToWGS84 = applyHelmert . helmert
 -- > helmertFromWGS84 e . helmertToWGS84 e = id
-data Ellipsoid =
-   Ellipsoid
+data TRF =
+   TRF
       (Length Double)         -- majorRadius
       (Dimensionless Double)  -- flatR
       Helmert                 -- helmert
    deriving (Eq, Show)
 
-class HasEllipsoid a where
-   ellipsoid ::   
-      Lens' a Ellipsoid
+class HasTRF a where
+   trf ::   
+      Lens' a TRF
    majorRadius ::
       Lens' a (Length Double)
    {-# INLINE majorRadius #-}
@@ -290,28 +290,28 @@ class HasEllipsoid a where
       Lens' a (Dimensionless Double)
    {-# INLINE flatR #-}
    majorRadius =
-      ellipsoid . majorRadius
+      trf . majorRadius
    flatR =  
-      ellipsoid . flatR
+      trf . flatR
 
-instance HasEllipsoid Ellipsoid where
+instance HasTRF TRF where
    {-# INLINE majorRadius #-}
    {-# INLINE flatR #-}
-   ellipsoid =
+   trf =
       id
-   majorRadius k (Ellipsoid r f h) =
-      fmap (\r' -> Ellipsoid r' f h) (k r)
-   flatR k (Ellipsoid r f h) =
-      fmap (\f' -> Ellipsoid r f' h) (k f)
+   majorRadius k (TRF r f h) =
+      fmap (\r' -> TRF r' f h) (k r)
+   flatR k (TRF r f h) =
+      fmap (\f' -> TRF r f' h) (k f)
 
-instance HasHelmert Ellipsoid where
-   helmert k (Ellipsoid r f h) =
-      fmap (\h' -> Ellipsoid r f h') (k h)
+instance HasHelmert TRF where
+   helmert k (TRF r f h) =
+      fmap (\h' -> TRF r f h') (k h)
 
 _WGS84 ::
-  Ellipsoid
+  TRF
 _WGS84 =
-   Ellipsoid
+   TRF
       (6378137.0 *~ meter)
       (298.257223563 *~ one)
       mempty
@@ -328,51 +328,51 @@ helmertFromWSG84 e = applyHelmert (inverseHelmert (e ^. helmert))
 -- as defined in \"Technical Manual DMA TM 8358.1 - Datums, Ellipsoids, Grids, and 
 -- Grid Reference Systems\" at the National Geospatial-Intelligence Agency (NGA).
 -- 
--- The WGS84 has a special place in this library as the standard Ellipsoid against
+-- The WGS84 has a special place in this library as the standard TRF against
 -- which all others are defined.
 
    
 -- | Flattening (f) of an ellipsoid.
-flattening :: HasEllipsoid e => e -> Dimensionless Double
+flattening :: HasTRF e => e -> Dimensionless Double
 flattening e = _1 / (e ^. flatR)
 
 -- | The minor radius of an ellipsoid.
-minorRadius :: HasEllipsoid e => e -> Length Double
+minorRadius :: HasTRF e => e -> Length Double
 minorRadius e = (e ^. majorRadius) * (_1 - flattening e)
 
 
 -- | The eccentricity squared of an ellipsoid.
-eccentricity2 :: HasEllipsoid e => e -> Dimensionless Double
+eccentricity2 :: HasTRF e => e -> Dimensionless Double
 eccentricity2 e = _2 * f - (f * f) where f = flattening e
 
 -- | The second eccentricity squared of an ellipsoid.
-eccentricity'2 :: HasEllipsoid e => e -> Dimensionless Double
+eccentricity'2 :: HasTRF e => e -> Dimensionless Double
 eccentricity'2 e = (f * (_2 - f)) / (_1 - f * f) where f = flattening e
 
 
 -- | Distance from the surface at the specified latitude to the 
 -- axis of the Earth straight down. Also known as the radius of 
 -- curvature in the prime vertical, and often denoted @N@.
-normal :: HasEllipsoid e => e -> Angle Double -> Length Double
+normal :: HasTRF e => e -> Angle Double -> Length Double
 normal e lat = (e ^. majorRadius) / sqrt (_1 - eccentricity2 e * sin lat ^ pos2)
 
 
 -- | Radius of the circle of latitude: the distance from a point 
 -- at that latitude to the axis of the Earth.
-latitudeRadius :: HasEllipsoid e => e -> Angle Double -> Length Double
+latitudeRadius :: HasTRF e => e -> Angle Double -> Length Double
 latitudeRadius e lat = normal e lat * cos lat
 
 
 -- | Radius of curvature in the meridian at the specified latitude. 
 -- Often denoted @M@.
-meridianRadius :: HasEllipsoid e => e -> Angle Double -> Length Double
+meridianRadius :: HasTRF e => e -> Angle Double -> Length Double
 meridianRadius e lat = 
    (e ^. majorRadius ) * (_1 - eccentricity2 e)
    / sqrt ((_1 - eccentricity2 e * sin lat ^ pos2) ^ pos3)
    
 
 -- | Radius of curvature of the ellipsoid perpendicular to the meridian at the specified latitude.
-primeVerticalRadius :: HasEllipsoid e => e -> Angle Double -> Length Double
+primeVerticalRadius :: HasTRF e => e -> Angle Double -> Length Double
 primeVerticalRadius e lat =
    (e ^. majorRadius ) / sqrt (_1 - eccentricity2 e * sin lat ^ pos2)
 
@@ -383,7 +383,7 @@ primeVerticalRadius e lat =
 -- Mercator projection. The name "isometric" arises from the fact that at any point 
 -- on the ellipsoid equal increments of ψ and longitude λ give rise to equal distance 
 -- displacements along the meridians and parallels respectively.
-isometricLatitude :: HasEllipsoid e => e -> Angle Double -> Angle Double
+isometricLatitude :: HasTRF e => e -> Angle Double -> Angle Double
 isometricLatitude ellipse lat = atanh sinLat - e * atanh (e * sinLat)
    where
       sinLat = sin lat
