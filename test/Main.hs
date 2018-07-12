@@ -2,6 +2,7 @@
 
 module Main where
 
+import Control.Lens((^.), (.~))
 import Data.Maybe
 import Data.Monoid
 import Numeric.Units.Dimensional.Prelude
@@ -108,19 +109,19 @@ sameAngle v1 v2 = abs (properAngle (v1 - v2)) < 0.01 *~ arcsecond
 
 -- | The grid positions are within 1mm
 sameGrid :: GridClass r => GridPoint r -> GridPoint r -> Bool
-sameGrid p1 p2 = check eastings && check northings && check altitude
+sameGrid p1 p2 = check (^. eastings) && check (^. northings) && check (^. altitude)
    where check f = f p1 - f p2 < 1 *~ milli meter
 
 
 -- | Grid offsets are within 1mm.
 sameOffset :: GridOffset -> GridOffset -> Bool
-sameOffset go1 go2 = check deltaNorth && check deltaEast && check deltaAltitude
+sameOffset go1 go2 = check (^. deltaNorthL) && check (^. deltaEastL) && check (^. deltaAltitudeL)
    where check f = f go1 - f go2 < 1 *~ milli meter
 
 
 -- | The grid X and Y are both within 1 meter
 closeGrid :: GridClass r => GridPoint r -> GridPoint r -> Bool
-closeGrid p1 p2 = check eastings && check northings && check altitude
+closeGrid p1 p2 = check (^. eastings) && check (^. northings) && check (^. altitude)
    where check f = f p1 - f p2 < 1 *~ meter
 
 -- | Degrees, minutes and seconds into radians. 
@@ -129,7 +130,7 @@ dms d m s = fromIntegral d *~ degree + fromIntegral m *~ arcminute + s *~ arcsec
 
 -- | Round-trip from local to WGS84 and back is identity (approximately)
 prop_WGS84_and_back :: Geodetic -> Bool
-prop_WGS84_and_back p = samePlace p $ toLocal (ellipsoid p) $ toWGS84 p
+prop_WGS84_and_back p = samePlace p $ toLocal (p ^. ellipsoid) $ toWGS84 p
 
 
 -- | Sample pairs of points with bearings and distances. 
@@ -192,7 +193,7 @@ prop_offset2 (Distance d) (Bearing h) (Scalar s) = sameOffset go1 go2
 prop_offset3 :: GridOffset -> Bool
 prop_offset3 delta = sameOffset delta0 
                                 (polarOffset (offsetDistance delta0) (offsetBearing delta))
-   where delta0 = delta {deltaAltitude = 0 *~ meter}
+   where delta0 = (deltaAltitudeL .~ (0 *~ meter)) delta
 
 -- | Given a grid point and an offset, applying the offset to the point gives a new point which
 -- is offset from the first point by the argument offset.
@@ -326,9 +327,8 @@ stereographicFromGridS = samePlace p1 p1'
 prop_stereographic :: GridPoint GridStereo -> Property
 prop_stereographic p =
    let g = fromGrid p
-       r = toGrid (gridBasis p) g
-   in counterexample ("p = " ++ show p ++ "\ng = " ++ show g ++ "\nr = " ++ show r) $
-     closeGrid p r 
+       r = toGrid (p ^. gridBasis) g
+   in counterexample ("p = " ++ show p ++ "\ng = " ++ show g ++ "\nr = " ++ show r) $ closeGrid p r 
 
 
 
@@ -386,9 +386,9 @@ prop_rayBisect :: Ray -> Altitude -> Bool
 prop_rayBisect r (Altitude height) = 
    case bisect ray0 f (1 *~ centi meter) (0 *~ meter) (1000 *~ kilo meter) of
       Nothing -> False
-      Just d -> let (g, _, _) = pathFunc ray0 d in abs (altitude g - height) < 1 *~ centi meter
+      Just d -> let (g, _, _) = pathFunc ray0 d in abs ((g ^. altitude) - height) < 1 *~ centi meter
    where
-      f g = compare (altitude g) height
+      f g = compare (g ^. altitude) height
       ray0 = getRay r
    
 

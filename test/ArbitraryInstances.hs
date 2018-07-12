@@ -6,11 +6,15 @@
 module ArbitraryInstances where
 
 import Control.Applicative
+import Control.Lens((^.))
 import Control.Monad
 import Geodetics.Altitude
 import Geodetics.Geodetic
 import Geodetics.Grid
+import Geodetics.GridScale
 import Geodetics.Ellipsoids
+import Geodetics.Latitude
+import Geodetics.Longitude
 import Geodetics.Path
 import Geodetics.Stereographic as SG
 import Geodetics.TransverseMercator as TM
@@ -135,9 +139,9 @@ instance Arbitrary Helmert where
          ((*~ one) <$> choose (-5,10)) <*>
          genSeconds <*> genSeconds <*> genSeconds
    shrink h = 
-      tail $ Helmert <$> shrinkLength (cX h) <*> shrinkLength (cY h) <*> shrinkLength (cZ h) <*>
-         shrinkUnit (helmertScale h) <*>
-         shrinkUnit (rX h) <*> shrinkUnit (rY h) <*> shrinkUnit (rZ h)      
+      tail $ Helmert <$> shrinkLength (h ^. cXL) <*> shrinkLength (h ^. cYL) <*> shrinkLength (h ^. cZL) <*>
+         shrinkUnit (h ^. helmertScaleL) <*>
+         shrinkUnit (h ^. rXL) <*> shrinkUnit (h ^. rYL) <*> shrinkUnit (h ^. rZL)      
 
 instance Arbitrary Ellipsoid where
    arbitrary =
@@ -152,41 +156,46 @@ instance Arbitrary Geodetic where
    arbitrary = 
       Geodetic <$> genLatitude <*> genLongitude <*> genOffset 1 <*> arbitrary
    shrink g = 
-      tail $ Geodetic <$> shrinkAngle (latitude g) <*> shrinkAngle (longitude g) <*> 
-         shrinkLength (altitude g) <*> shrink' (ellipsoid g)
+      tail $
+         Geodetic <$>
+         shrinkAngle (g ^. latitudeL) <*>
+         shrinkAngle (g ^. longitudeL) <*> 
+         shrinkLength (g ^. altitude) <*>
+         shrink' (g ^. ellipsoid)
 
 instance Arbitrary (GridPoint GridTM) where
    arbitrary = GridPoint <$> genOffset 100000 <*> genOffset 100000 <*> genOffset 1 <*> arbitrary
-   shrink p = tail $ GridPoint <$> 
-      shrinkLength (eastings p) <*> 
-      shrinkLength (northings p) <*> 
-      shrinkLength (altitude p) <*> 
-      shrink' (gridBasis p)
+   shrink p = 
+      tail $ GridPoint <$> 
+         shrinkLength (p ^. eastings) <*> 
+         shrinkLength (p ^. northings) <*> 
+         shrinkLength (p ^. altitude) <*> 
+         shrink' (p ^. gridBasis)
 
 
 instance Arbitrary (GridPoint GridStereo) where
    arbitrary = GridPoint <$> genOffset 100000 <*> genOffset 100000 <*> genOffset 1 <*> arbitrary
-   shrink p = tail $ GridPoint <$> 
-      shrinkLength (eastings p) <*> 
-      shrinkLength (northings p) <*> 
-      shrinkLength (altitude p) <*> 
-      shrink' (gridBasis p)
+   shrink p =
+      tail $ GridPoint <$> 
+         shrinkLength (p ^. eastings) <*> 
+         shrinkLength (p ^. northings) <*> 
+         shrinkLength (p ^. altitude) <*> 
+         shrink' (p ^. gridBasis)
 
 
 instance Arbitrary GridTM where
    arbitrary = mkGridTM <$> arbitrary <*> arbitrary <*> ((*~ one) <$> choose (0.95,1.0))
-   shrink tm = tail $ mkGridTM <$> shrink' (trueOrigin tm) <*> shrink' (falseOrigin tm) <*> [TM.gridScale tm]
+   shrink tm = tail $ mkGridTM <$> shrink' (tm ^. geodetic) <*> shrink' (tm ^. gridOffsetL) <*> [tm ^. gridScale]
    
    
 instance Arbitrary GridOffset where
    arbitrary = GridOffset <$> genOffset 100000 <*> genOffset 100000 <*> genAlt
-   shrink d = tail $ GridOffset <$> 
-      shrinkLength (deltaEast d) <*> shrinkLength (deltaNorth d) <*> shrinkLength (deltaAltitude d)
+   shrink d = tail $ GridOffset <$> shrinkLength (d ^. deltaEastL) <*> shrinkLength (d ^. deltaNorthL) <*> shrinkLength (d ^. deltaAltitudeL)
 
 
 instance Arbitrary GridStereo where
    arbitrary = mkGridStereo <$> arbitrary <*> arbitrary <*> ((*~ one) <$> choose (0.95,1.0))
-   shrink sg = tail $ mkGridStereo <$> shrink' (gridTangent sg) <*> shrink' (gridOrigin sg) <*> [SG.gridScale sg]
+   shrink sg = tail $ mkGridStereo <$> shrink' (sg ^. geodetic) <*> shrink' (sg ^. gridOffsetL) <*> [sg ^. gridScale]
    
 
 -- | Wrapper for arbitrary rays, along with creation parameters for printing and shrinking.
@@ -229,7 +238,7 @@ instance Show RhumbPaths2 where
           
 instance Arbitrary RhumbPaths2 where
    arbitrary = RP2 
-      <$> arbitrary `suchThat` ((< 70 *~ degree) . abs . latitude)
+      <$> arbitrary `suchThat` ((< 70 *~ degree) . abs . (^. latitudeL))
       <*> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary
    shrink rp = 
       tail $ RP2 <$> 
