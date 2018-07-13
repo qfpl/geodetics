@@ -79,6 +79,10 @@ instance HasGeodetic Geodetic where
    geodetic =
       id
 
+instance HasEllipsoid Geodetic where
+   ellipsoid =
+    trf . ellipsoid
+
 instance HasTRF Geodetic where
    trf k (Geodetic lat' lon' alt' e) =
       fmap (\x -> Geodetic lat' lon' alt' x) (k e)
@@ -182,7 +186,7 @@ geoToEarth geo = V3 (
 -- Uses the closed form solution of H. Vermeille: Direct
 -- transformation from geocentric coordinates to geodetic coordinates.
 -- Journal of Geodesy Volume 76, Number 8 (2002), 451-454
-earthToGeo :: HasTRF e => e -> ECEF -> (Angle Double, Angle Double, Length Double)
+earthToGeo :: HasEllipsoid e => e -> ECEF -> (Angle Double, Angle Double, Length Double)
 earthToGeo e (V3 x y z) = (phi, atan2 y x, sqrt (l ^ pos2 + p2) - norm)
    where
       -- Naming: numeric suffix indicates power. Hence x2 = x * x, x3 = x2 * x, etc.

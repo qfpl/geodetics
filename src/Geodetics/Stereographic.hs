@@ -135,6 +135,10 @@ instance HasLongitude GridStereo where
    longitude =
       geodetic . longitude
 
+instance HasEllipsoid GridStereo where
+   ellipsoid =
+      geodetic . ellipsoid
+
 instance HasTRF GridStereo where
    trf =
       geodetic . trf

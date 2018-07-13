@@ -102,6 +102,10 @@ instance HasAltitude GridTM where
   altitude =
     geodetic . altitude
 
+instance HasEllipsoid GridTM where
+  ellipsoid =
+    geodetic . ellipsoid
+
 instance HasTRF GridTM where
   trf =
     geodetic . trf

@@ -36,12 +36,15 @@ _OSGB36 ::
   TRF
 _OSGB36 =
    TRF
-     (6377563.396 *~ meter)
-     (299.3249646 *~ one)
-     (Helmert 
-      (446.448 *~ meter) ((-125.157) *~ meter) (542.06 *~ meter)
-      ((-20.4894) *~ one)
-      (0.1502 *~ arcsecond) (0.247 *~ arcsecond) (0.8421 *~ arcsecond))
+    (
+      Ellipsoid
+        (6377563.396 *~ meter)
+        (299.3249646 *~ one)
+    )
+    (Helmert 
+       (446.448 *~ meter) ((-125.157) *~ meter) (542.06 *~ meter)
+       ((-20.4894) *~ one)
+       (0.1502 *~ arcsecond) (0.247 *~ arcsecond) (0.8421 *~ arcsecond))
 
 -- | The UK National Grid is a Transverse Mercator projection with a true origin at
 -- 49 degrees North, 2 degrees West on OSGB36, and a false origin 400km West and 100 km North of

@@ -17,6 +17,8 @@ module Geodetics.Ellipsoids (
    -- ** TRF models of the Geoid
    TRF (..),
    HasTRF(..),
+   Ellipsoid (..),
+   HasEllipsoid(..),
    helmertFromWSG84,
    helmertToWSG84,
    _WGS84,
@@ -273,16 +275,16 @@ applyHelmert h (V3 x y z) = V3 (
 -- 
 -- > helmertToWGS84 = applyHelmert . helmert
 -- > helmertFromWGS84 e . helmertToWGS84 e = id
-data TRF =
-   TRF
+
+data Ellipsoid =
+   Ellipsoid
       (Length Double)         -- majorRadius
       (Dimensionless Double)  -- flatR
-      Helmert                 -- helmert
    deriving (Eq, Show)
 
-class HasTRF a where
-   trf ::   
-      Lens' a TRF
+class HasEllipsoid a where
+   ellipsoid ::
+     Lens' a Ellipsoid
    majorRadius ::
       Lens' a (Length Double)
    {-# INLINE majorRadius #-}
@@ -290,30 +292,51 @@ class HasTRF a where
       Lens' a (Dimensionless Double)
    {-# INLINE flatR #-}
    majorRadius =
-      trf . majorRadius
+      ellipsoid . majorRadius
    flatR =  
-      trf . flatR
+      ellipsoid . flatR
 
-instance HasTRF TRF where
+instance HasEllipsoid Ellipsoid where
    {-# INLINE majorRadius #-}
    {-# INLINE flatR #-}
+   ellipsoid =
+      id
+   majorRadius k (Ellipsoid r f) =
+      fmap (\r' -> Ellipsoid r' f) (k r)
+   flatR k (Ellipsoid r f) =
+      fmap (\f' -> Ellipsoid r f') (k f)
+
+data TRF =
+   TRF
+      Ellipsoid
+      Helmert                 -- helmert
+   deriving (Eq, Show)
+
+class HasTRF a where
+   trf ::   
+      Lens' a TRF
+   
+instance HasTRF TRF where
    trf =
       id
-   majorRadius k (TRF r f h) =
-      fmap (\r' -> TRF r' f h) (k r)
-   flatR k (TRF r f h) =
-      fmap (\f' -> TRF r f' h) (k f)
 
 instance HasHelmert TRF where
-   helmert k (TRF r f h) =
-      fmap (\h' -> TRF r f h') (k h)
+   helmert k (TRF e h) =
+      fmap (\h' -> TRF e h') (k h)
+
+instance HasEllipsoid TRF where
+   ellipsoid k (TRF e h) =
+      fmap (\e' -> TRF e' h) (k e)
 
 _WGS84 ::
   TRF
 _WGS84 =
    TRF
-      (6378137.0 *~ meter)
-      (298.257223563 *~ one)
+      (
+         Ellipsoid
+            (6378137.0 *~ meter)
+            (298.257223563 *~ one)
+      )
       mempty
 
 helmertToWSG84 :: HasHelmert e => e -> ECEF -> ECEF
@@ -333,46 +356,46 @@ helmertFromWSG84 e = applyHelmert (inverseHelmert (e ^. helmert))
 
    
 -- | Flattening (f) of an ellipsoid.
-flattening :: HasTRF e => e -> Dimensionless Double
+flattening :: HasEllipsoid e => e -> Dimensionless Double
 flattening e = _1 / (e ^. flatR)
 
 -- | The minor radius of an ellipsoid.
-minorRadius :: HasTRF e => e -> Length Double
+minorRadius :: HasEllipsoid e => e -> Length Double
 minorRadius e = (e ^. majorRadius) * (_1 - flattening e)
 
 
 -- | The eccentricity squared of an ellipsoid.
-eccentricity2 :: HasTRF e => e -> Dimensionless Double
+eccentricity2 :: HasEllipsoid e => e -> Dimensionless Double
 eccentricity2 e = _2 * f - (f * f) where f = flattening e
 
 -- | The second eccentricity squared of an ellipsoid.
-eccentricity'2 :: HasTRF e => e -> Dimensionless Double
+eccentricity'2 :: HasEllipsoid e => e -> Dimensionless Double
 eccentricity'2 e = (f * (_2 - f)) / (_1 - f * f) where f = flattening e
 
 
 -- | Distance from the surface at the specified latitude to the 
 -- axis of the Earth straight down. Also known as the radius of 
 -- curvature in the prime vertical, and often denoted @N@.
-normal :: HasTRF e => e -> Angle Double -> Length Double
+normal :: HasEllipsoid e => e -> Angle Double -> Length Double
 normal e lat = (e ^. majorRadius) / sqrt (_1 - eccentricity2 e * sin lat ^ pos2)
 
 
 -- | Radius of the circle of latitude: the distance from a point 
 -- at that latitude to the axis of the Earth.
-latitudeRadius :: HasTRF e => e -> Angle Double -> Length Double
+latitudeRadius :: HasEllipsoid e => e -> Angle Double -> Length Double
 latitudeRadius e lat = normal e lat * cos lat
 
 
 -- | Radius of curvature in the meridian at the specified latitude. 
 -- Often denoted @M@.
-meridianRadius :: HasTRF e => e -> Angle Double -> Length Double
+meridianRadius :: HasEllipsoid e => e -> Angle Double -> Length Double
 meridianRadius e lat = 
    (e ^. majorRadius ) * (_1 - eccentricity2 e)
    / sqrt ((_1 - eccentricity2 e * sin lat ^ pos2) ^ pos3)
    
 
 -- | Radius of curvature of the ellipsoid perpendicular to the meridian at the specified latitude.
-primeVerticalRadius :: HasTRF e => e -> Angle Double -> Length Double
+primeVerticalRadius :: HasEllipsoid e => e -> Angle Double -> Length Double
 primeVerticalRadius e lat =
    (e ^. majorRadius ) / sqrt (_1 - eccentricity2 e * sin lat ^ pos2)
 
@@ -383,7 +406,7 @@ primeVerticalRadius e lat =
 -- Mercator projection. The name "isometric" arises from the fact that at any point 
 -- on the ellipsoid equal increments of ψ and longitude λ give rise to equal distance 
 -- displacements along the meridians and parallels respectively.
-isometricLatitude :: HasTRF e => e -> Angle Double -> Angle Double
+isometricLatitude :: HasEllipsoid e => e -> Angle Double -> Angle Double
 isometricLatitude ellipse lat = atanh sinLat - e * atanh (e * sinLat)
    where
       sinLat = sin lat
