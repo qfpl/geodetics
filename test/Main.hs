@@ -274,7 +274,7 @@ ukTest = Geodetic (dms 52 39 27.2531) (dms 1 43 4.5177) (0 *~ meter) _OSGB36
 stereoGridN :: GridStereo
 stereoGridN = mkGridStereo tangent origin (0.9999079 *~ one)
    where
-      ellipse = undefined -- TRF (6377397.155 *~ metre) (299.15281 *~ one) mempty
+      ellipse = TRF (Ellipsoid (6377397.155 *~ metre) (299.15281 *~ one)) mempty
       tangent = Geodetic (dms 52 9 22.178) (dms 5 23 15.500) (0 *~ meter) ellipse
       origin = GridOffset (155000 *~ metre) (463000 *~ metre) (0 *~ meter)
       
@@ -285,7 +285,7 @@ stereoGridN = mkGridStereo tangent origin (0.9999079 *~ one)
 stereoGridS :: GridStereo
 stereoGridS = mkGridStereo tangent origin (0.9999079 *~ one)
    where
-      ellipse = undefined -- TRF (6377397.155 *~ metre) (299.15281 *~ one) mempty
+      ellipse = TRF (Ellipsoid (6377397.155 *~ metre) (299.15281 *~ one)) mempty
       tangent = Geodetic (negate $ dms 52 9 22.178) (dms 5 23 15.500) (0 *~ meter) ellipse
       origin = GridOffset ((-155000) *~ metre) (463000 *~ metre) (0 *~ meter)
 
