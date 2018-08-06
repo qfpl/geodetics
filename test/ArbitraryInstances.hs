@@ -6,18 +6,19 @@
 module ArbitraryInstances where
 
 import Control.Applicative
-import Control.Lens((^.))
+import Control.Lens((^.), _Wrapped')
 import Control.Monad
-import Geodetics.Altitude
 import Geodetics.Geodetic
 import Geodetics.Grid
-import Geodetics.GridScale
 import Geodetics.Ellipsoids
-import Geodetics.Latitude
-import Geodetics.Longitude
 import Geodetics.Path
 import Geodetics.Stereographic as SG
 import Geodetics.TransverseMercator as TM
+import Geodetics.Types.Altitude
+import Geodetics.Types.Latitude
+import Geodetics.Types.Longitude
+import Geodetics.Types.Ellipsoid
+import Geodetics.Types.TRF
 import Numeric.Units.Dimensional.Prelude
 import qualified Prelude ()
 import Test.QuickCheck
@@ -64,9 +65,6 @@ newtype Distance2 = Distance2 (Length Double) deriving (Show)
 instance Arbitrary Distance2 where
    arbitrary = Distance2 <$> (*~ kilo meter) <$> choose (0,1000)
    shrink (Distance2 d) = Distance2 <$> shrinkDimension (kilo meter) d
-
--- | Wrapper for arbitrary altitudes up to 10 km
-newtype Altitude = Altitude (Length Double) deriving (Show)
 
 instance Arbitrary Altitude where
    arbitrary = Altitude <$> (*~ kilo meter) <$> choose (0,10)
@@ -139,68 +137,79 @@ instance Arbitrary Helmert where
          ((*~ one) <$> choose (-5,10)) <*>
          genSeconds <*> genSeconds <*> genSeconds
    shrink h = 
-      tail $ Helmert <$> shrinkLength (h ^. cX) <*> shrinkLength (h ^. cY) <*> shrinkLength (h ^. cZ) <*>
-         shrinkUnit (h ^. helmertScale) <*>
-         shrinkUnit (h ^. rX) <*> shrinkUnit (h ^. rY) <*> shrinkUnit (h ^. rZ)
+      tail $ Helmert <$> shrinkLength ((^. cX) h) <*> shrinkLength ((^. cY) h) <*> shrinkLength ((^. cZ) h) <*>
+         shrinkUnit ((^. helmertScale) h) <*>
+         shrinkUnit ((^. rX) h) <*> shrinkUnit ((^. rY) h) <*> shrinkUnit ((^. rZ) h)
 
 instance Arbitrary Ellipsoid where
    arbitrary =
       Ellipsoid <$>
         ((*~ meter) <$> choose (6378100, 6378400)) <*>
         ((*~ one) <$> choose (297,300))
-   shrink e = shrink' (Ellipsoid (e ^. majorRadius) (e ^. flatR))
-     
+
 instance Arbitrary TRF where
    arbitrary =
-      TRF <$>
-         arbitrary <*>
-         arbitrary    
-   shrink e = tail $ TRF (Ellipsoid (e ^. majorRadius) (e ^. flatR)) <$> shrink' (e ^. helmert)
+      TRF <$> 
+        arbitrary <*>
+        arbitrary
+
+   {-
+   arbitrary =
+      Ellipsoid <$>
+         ((*~ meter) <$> choose (6378100, 6378400)) <*>                  -- majorRadius
+         ((*~ one) <$> choose (297,300)) <*>                             -- flatR
+         arbitrary                                                       -- helmert
+   shrink e = tail $ Ellipsoid (majorRadius e) (flatR e) <$> shrink' (helmert e)
+-}
+
         
 instance Arbitrary Geodetic where
    arbitrary = 
-      Geodetic <$> genLatitude <*> genLongitude <*> genOffset 1 <*> arbitrary
+      Geodetic <$>
+         (Latitude <$> genLatitude) <*>
+         (Longitude <$> genLongitude) <*>
+         (Altitude <$> genOffset 1) <*>
+         arbitrary
    shrink g = 
       tail $
          Geodetic <$>
-         shrinkAngle (g ^. latitude) <*>
-         shrinkAngle (g ^. longitude) <*> 
-         shrinkLength (g ^. altitude) <*>
-         shrink' (g ^. trf)
+         (Latitude <$> shrinkAngle ((^. latitude . _Wrapped') g)) <*>
+         (Longitude <$> shrinkAngle ((^. longitude . _Wrapped') g)) <*>
+         (Altitude <$> shrinkLength ((^. altitude . _Wrapped') g)) <*>
+         (shrink' ((^. trf) g))
 
 instance Arbitrary (GridPoint GridTM) where
    arbitrary = GridPoint <$> genOffset 100000 <*> genOffset 100000 <*> genOffset 1 <*> arbitrary
-   shrink p = 
-      tail $ GridPoint <$> 
-         shrinkLength (p ^. eastings) <*> 
-         shrinkLength (p ^. northings) <*> 
-         shrinkLength (p ^. altitude) <*> 
-         shrink' (p ^. gridBasis)
+   shrink p = tail $ GridPoint <$> 
+      shrinkLength (eastings p) <*> 
+      shrinkLength (northings p) <*> 
+      shrinkLength ((^. altitude . _Wrapped') p) <*> 
+      shrink' (gridBasis p)
 
 
 instance Arbitrary (GridPoint GridStereo) where
    arbitrary = GridPoint <$> genOffset 100000 <*> genOffset 100000 <*> genOffset 1 <*> arbitrary
-   shrink p =
-      tail $ GridPoint <$> 
-         shrinkLength (p ^. eastings) <*> 
-         shrinkLength (p ^. northings) <*> 
-         shrinkLength (p ^. altitude) <*> 
-         shrink' (p ^. gridBasis)
+   shrink p = tail $ GridPoint <$> 
+      shrinkLength (eastings p) <*> 
+      shrinkLength (northings p) <*> 
+      shrinkLength ((^. altitude . _Wrapped') p) <*> 
+      shrink' (gridBasis p)
 
 
 instance Arbitrary GridTM where
    arbitrary = mkGridTM <$> arbitrary <*> arbitrary <*> ((*~ one) <$> choose (0.95,1.0))
-   shrink tm = tail $ mkGridTM <$> shrink' (tm ^. geodetic) <*> shrink' (tm ^. gridOffsetL) <*> [tm ^. gridScale]
+   shrink tm = tail $ mkGridTM <$> shrink' (trueOrigin tm) <*> shrink' (falseOrigin tm) <*> [TM.gridScale tm]
    
    
 instance Arbitrary GridOffset where
    arbitrary = GridOffset <$> genOffset 100000 <*> genOffset 100000 <*> genAlt
-   shrink d = tail $ GridOffset <$> shrinkLength (d ^. deltaEastL) <*> shrinkLength (d ^. deltaNorthL) <*> shrinkLength (d ^. deltaAltitudeL)
+   shrink d = tail $ GridOffset <$> 
+      shrinkLength (deltaEast d) <*> shrinkLength (deltaNorth d) <*> shrinkLength (deltaAltitude d)
 
 
 instance Arbitrary GridStereo where
    arbitrary = mkGridStereo <$> arbitrary <*> arbitrary <*> ((*~ one) <$> choose (0.95,1.0))
-   shrink sg = tail $ mkGridStereo <$> shrink' (sg ^. geodetic) <*> shrink' (sg ^. gridOffsetL) <*> [sg ^. gridScale]
+   shrink sg = tail $ mkGridStereo <$> shrink' (gridTangent sg) <*> shrink' (gridOrigin sg) <*> [SG.gridScale sg]
    
 
 -- | Wrapper for arbitrary rays, along with creation parameters for printing and shrinking.
@@ -243,7 +252,7 @@ instance Show RhumbPaths2 where
           
 instance Arbitrary RhumbPaths2 where
    arbitrary = RP2 
-      <$> arbitrary `suchThat` ((< 70 *~ degree) . abs . (^. latitude))
+      <$> arbitrary `suchThat` ((< 70 *~ degree) . abs . (^. latitude . _Wrapped'))
       <*> arbitrary <*> arbitrary <*> arbitrary <*> arbitrary
    shrink rp = 
       tail $ RP2 <$> 

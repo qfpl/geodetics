@@ -1,13 +1,8 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies, FlexibleInstances #-}
-
 module Geodetics.Grid (
    -- ** Grid types
    GridClass (..),
    GridPoint (..),
-   HasGridPoint(..),
    GridOffset (..),
-   HasGridOffset (..),
    -- ** Grid operations
    polarOffset,
    offsetScale,
@@ -24,14 +19,14 @@ module Geodetics.Grid (
    toGridDigits
 ) where
 
-import Control.Lens(Lens', (^.))
-import Data.Char(isDigit, digitToInt)
-import Data.Function((.))
+import Control.Lens((^.), _Wrapped')
+import Data.Char
+import Data.Function
 import Data.Monoid (Monoid)
 import Data.Semigroup (Semigroup, (<>))
-import Geodetics.Altitude(HasAltitude(altitude))
-import Geodetics.Geodetic(Geodetic)
-import Geodetics.Ellipsoids(TRF)
+import Geodetics.Geodetic
+import Geodetics.Types.Altitude
+import Geodetics.Types.TRF
 import Numeric.Units.Dimensional.Prelude hiding ((.))
 import qualified Prelude as P
 
@@ -44,65 +39,25 @@ import qualified Prelude as P
 class GridClass r where
    fromGrid :: GridPoint r -> Geodetic
    toGrid :: r -> Geodetic -> GridPoint r
-   gridTRF :: r -> TRF
+   gridEllipsoid :: r -> TRF
 
 
 -- | A point on the specified grid. 
-data GridPoint r = GridPoint 
-   (Length Double)
-   (Length Double)
-   (Length Double)
-   r
-   deriving (Show)
+data GridPoint r = GridPoint {
+   eastings, northings, altGP :: Length Double,
+   gridBasis :: r
+} deriving (Show)
 
-class HasGridPoint a r | a -> r where
-   gridPoint ::
-      Lens' a (GridPoint r)
-   eastings ::
-      Lens' a (Length Double)
-   {-# INLINE eastings #-}
-   northings ::
-      Lens' a (Length Double)
-   {-# INLINE northings #-}
-   altGP ::
-      Lens' a (Length Double)
-   {-# INLINE altGP #-}
-   gridBasis ::
-      Lens' a r
-   {-# INLINE gridBasis #-}
-   altGP =
-      gridPoint . altGP
-   eastings =
-      gridPoint . eastings
-   gridBasis =
-      gridPoint . gridBasis
-   northings =
-      gridPoint . northings
-
-instance HasGridPoint (GridPoint r) r where
-   {-# INLINE eastings #-}
-   {-# INLINE northings #-}
-   {-# INLINE altGP #-}
-   {-# INLINE gridBasis #-}
-   gridPoint = P.id
-   eastings k (GridPoint e n a g) =
-      fmap (\x -> GridPoint x n a g) (k e)
-   northings k (GridPoint e n a g) =
-      fmap (\x -> GridPoint e x a g) (k n)
-   altGP k (GridPoint e n a g) =
-      fmap (\x -> GridPoint e n x g) (k a)
-   gridBasis k (GridPoint e n a g) =
-      fmap (\x -> GridPoint e n a x) (k g)
 
 instance Eq (GridPoint r) where
    p1 == p2  = 
-      (p1 ^. eastings) == (p2 ^. eastings) && 
-      (p1 ^. northings) == (p2 ^. northings) && 
-      (p1 ^. altGP) == (p2 ^. altGP)
+      eastings p1 == eastings p2 && 
+      northings p1 == northings p2 && 
+      altGP p1 == altGP p2
 
 instance HasAltitude (GridPoint g) where
    altitude k (GridPoint e n a b) = 
-      fmap (\x -> GridPoint e n x b) (k a)
+      fmap (\(Altitude x) -> GridPoint e n x b) (k (Altitude a))
 
 
 
@@ -111,48 +66,14 @@ instance HasAltitude (GridPoint g) where
 -- meaningful results if all the points come from the same grid.
 -- 
 -- The monoid instance is the sum of offsets.
-data GridOffset = GridOffset
-  (Length Double)
-  (Length Double)
-  (Length Double)
-  deriving (Eq, Show)
-
-class HasGridOffset a where
-   gridOffsetL ::
-     Lens' a GridOffset
-   deltaEastL ::
-     Lens' a (Length Double)
-   {-# INLINE deltaEastL #-}
-   deltaNorthL ::
-     Lens' a (Length Double)
-   {-# INLINE deltaNorthL #-}
-   deltaAltitudeL ::
-     Lens' a (Length Double)
-   {-# INLINE deltaAltitudeL #-}
-   deltaEastL =
-      gridOffsetL . deltaEastL
-   deltaNorthL =
-      gridOffsetL . deltaNorthL
-   deltaAltitudeL =
-      gridOffsetL . deltaAltitudeL
-
-instance HasGridOffset GridOffset where
-   {-# INLINE deltaEastL #-}
-   {-# INLINE deltaNorthL #-}
-   {-# INLINE deltaAltitudeL #-}
-   gridOffsetL =
-      P.id
-   deltaEastL k (GridOffset e n a) =
-      fmap (\x -> GridOffset x n a) (k e)
-   deltaNorthL k (GridOffset e n a) =
-      fmap (\x -> GridOffset e x a) (k n)
-   deltaAltitudeL k (GridOffset e n a) =
-      fmap (\x -> GridOffset e n x) (k a)
+data GridOffset = GridOffset {
+   deltaEast, deltaNorth, deltaAltitude :: Length Double
+} deriving (Eq, Show)
 
 instance Semigroup GridOffset where
-  g1 <> g2 = GridOffset (g1 ^. deltaEastL + g2 ^. deltaEastL)
-                        (g1 ^. deltaNorthL + g2 ^. deltaNorthL)
-                        (g1 ^. deltaAltitudeL + g2 ^. deltaAltitudeL)
+  g1 <> g2 = GridOffset (deltaEast g1 + deltaEast g2)
+                        (deltaNorth g1 + deltaNorth g2)
+                        (deltaAltitude g1 + deltaAltitude g2)
 
 instance Monoid GridOffset where
    mempty = GridOffset _0 _0 _0
@@ -169,23 +90,23 @@ polarOffset r d = GridOffset (r * sin d) (r * cos d) _0
 
 -- | Scale an offset by a scalar.
 offsetScale :: Dimensionless Double -> GridOffset -> GridOffset
-offsetScale s off = GridOffset (off ^. deltaEastL * s)
-                               (off ^. deltaNorthL * s)
-                               (off ^. deltaAltitudeL * s)
+offsetScale s off = GridOffset (deltaEast off * s)
+                               (deltaNorth off * s)
+                               (deltaAltitude off * s)
 
 -- | Invert an offset.
 offsetNegate :: GridOffset -> GridOffset
-offsetNegate off = GridOffset (negate $ off ^. deltaEastL)
-                              (negate $ off ^. deltaNorthL)
-                              (negate $ off ^. deltaAltitudeL)
+offsetNegate off = GridOffset (negate $ deltaEast off)
+                              (negate $ deltaNorth off)
+                              (negate $ deltaAltitude off)
 
 
 -- Add an offset on to a point to get another point.
 applyOffset :: GridOffset -> GridPoint g -> GridPoint g
-applyOffset off p = GridPoint ((p ^. eastings) + off ^. deltaEastL)
-                           ((p ^. northings) + off ^. deltaNorthL)
-                           ((p ^. altitude) + off ^. deltaAltitudeL)
-                           (p ^. gridBasis)
+applyOffset off p = GridPoint (eastings p + deltaEast off) 
+                           (northings p + deltaNorth off)
+                           (p ^. altitude . _Wrapped' + deltaAltitude off)
+                           (gridBasis p)
 
 
 -- | The distance represented by an offset.
@@ -196,19 +117,19 @@ offsetDistance = sqrt . offsetDistanceSq
 -- | The square of the distance represented by an offset.
 offsetDistanceSq :: GridOffset -> Area Double
 offsetDistanceSq off = 
-   (off ^. deltaEastL) ^ pos2 + (off ^. deltaNorthL) ^ pos2 + (off ^. deltaAltitudeL) ^ pos2
+   deltaEast off ^ pos2 + deltaNorth off ^ pos2 + deltaAltitude off ^ pos2
 
               
 -- | The direction represented by an offset, as bearing to the right of North.
 offsetBearing :: GridOffset -> Angle Double
-offsetBearing off = atan2 (off ^. deltaEastL) (off ^. deltaNorthL)
+offsetBearing off = atan2 (deltaEast off) (deltaNorth off)
 
 
 -- | The offset required to move from p1 to p2.             
 gridOffset :: GridPoint g -> GridPoint g -> GridOffset
-gridOffset p1 p2 = GridOffset ((p2 ^. eastings) - (p1 ^. eastings))
-                              ((p2 ^. northings) - (p1 ^. northings))
-                              ((p2 ^. altitude) - (p1 ^. altitude))
+gridOffset p1 p2 = GridOffset (eastings p2 - eastings p1)
+                              (northings p2 - northings p1)
+                              (p2 ^. altitude . _Wrapped' - p1 ^. altitude . _Wrapped')
 
 
 -- | Coerce a grid point of one type into a grid point of a different type, 
@@ -218,7 +139,7 @@ gridOffset p1 p2 = GridOffset ((p2 ^. eastings) - (p1 ^. eastings))
 -- It should be used only to convert between distinguished grids (e.g. "UkNationalGrid") and
 -- their equivalent numerical definitions.
 unsafeGridCoerce :: b -> GridPoint a -> GridPoint b
-unsafeGridCoerce base p = GridPoint (p ^. eastings) (p ^. northings) (p ^. altitude) base
+unsafeGridCoerce base p = GridPoint (eastings p) (northings p) (p ^. altitude . _Wrapped') base
 
 
 

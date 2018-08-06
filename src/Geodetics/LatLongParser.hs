@@ -1,5 +1,3 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-
 -- | The default reader for Geodetic ground positions is flexible but slow. If you are
 -- going to read positions in a known format and performance matters then use one of
 -- the more specialised parsers here.
@@ -18,18 +16,11 @@ module Geodetics.LatLongParser (
    latLong
 ) where
 
-import Control.Applicative((<*>), (*>), (<*))
-import Control.Monad(guard, return, (>>))
-import Data.Bool(not, (&&))
-import Data.Char(Char, isDigit)
-import Data.Foldable(null, length)
-import Data.List((++), splitAt)
-import Data.Eq((==))
-import Data.Function(($))
-import Data.Functor((<$>))
-import Data.Ord((<=), (<), (>), (>=))
-import Text.ParserCombinators.ReadP as P(ReadP, optional, munch1, option, char, (+++), skipSpaces, gather, choice)
-import Prelude(Integer, Double, Num((*), (+)), (-), (/), read, fromIntegral)
+import Control.Monad
+import Data.Char
+import Text.ParserCombinators.ReadP as P
+
+
 
 -- | Parse an unsigned Integer value.
 natural :: ReadP Integer  -- Beware arithmetic overflow of Int

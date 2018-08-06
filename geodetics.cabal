@@ -38,21 +38,18 @@ library
                    dimensional >= 1 && < 1.2,
                    array >= 0.4 && < 0.6,
                    linear >= 1.20 && < 1.21,
-                   lens >= 4.1 && < 5
+                   lens >= 4.1 && < 5,
+                   geodetic-types >= 0.0.1
 
 
   if !impl(ghc>=8.0)
     build-depends: semigroups >= 0.9 && < 0.19
-  ghc-options:     -Wall 
+  ghc-options:     -Wall -ddump-splices
   exposed-modules: 
-                   Geodetics.Altitude,
                    Geodetics.Ellipsoids,
                    Geodetics.Geodetic,
                    Geodetics.Grid,
-                   Geodetics.GridScale,
-                   Geodetics.Latitude,
                    Geodetics.LatLongParser,
-                   Geodetics.Longitude,
                    Geodetics.Path,
                    Geodetics.Stereographic,
                    Geodetics.TransverseMercator,
@@ -72,7 +69,8 @@ test-suite GeodeticTest
                    test-framework-quickcheck2,
                    test-framework-hunit,
                    array >= 0.4,
-                   lens >= 4.1 && < 5,                   
+                   geodetic-types >= 0.0.1,
+                   lens >= 4.1 && < 5,                 
                    checkers
   hs-source-dirs:  
                    test
