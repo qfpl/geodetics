@@ -2,7 +2,11 @@
 
 module Main where
 
+<<<<<<< HEAD
 import Control.Lens((^.), _Wrapped')
+=======
+import Control.Lens((^.), (.~))
+>>>>>>> c5162f79af10ba19aeda66fac966dc31768d576d
 import Data.Maybe
 import Data.Monoid
 import Numeric.Units.Dimensional.Prelude
@@ -113,19 +117,27 @@ sameAngle v1 v2 = abs (properAngle (v1 - v2)) < 0.01 *~ arcsecond
 
 -- | The grid positions are within 1mm
 sameGrid :: GridClass r => GridPoint r -> GridPoint r -> Bool
+<<<<<<< HEAD
 sameGrid p1 p2 = check eastings && check northings && check (^. altitude . _Wrapped')
+=======
+sameGrid p1 p2 = check (^. eastings) && check (^. northings) && check (^. altitude)
+>>>>>>> c5162f79af10ba19aeda66fac966dc31768d576d
    where check f = f p1 - f p2 < 1 *~ milli meter
 
 
 -- | Grid offsets are within 1mm.
 sameOffset :: GridOffset -> GridOffset -> Bool
-sameOffset go1 go2 = check deltaNorth && check deltaEast && check deltaAltitude
+sameOffset go1 go2 = check (^. deltaNorthL) && check (^. deltaEastL) && check (^. deltaAltitudeL)
    where check f = f go1 - f go2 < 1 *~ milli meter
 
 
 -- | The grid X and Y are both within 1 meter
 closeGrid :: GridClass r => GridPoint r -> GridPoint r -> Bool
+<<<<<<< HEAD
 closeGrid p1 p2 = check eastings && check northings && check (^. altitude . _Wrapped')
+=======
+closeGrid p1 p2 = check (^. eastings) && check (^. northings) && check (^. altitude)
+>>>>>>> c5162f79af10ba19aeda66fac966dc31768d576d
    where check f = f p1 - f p2 < 1 *~ meter
 
 -- | Degrees, minutes and seconds into radians. 
@@ -134,7 +146,11 @@ dms d m s = fromIntegral d *~ degree + fromIntegral m *~ arcminute + s *~ arcsec
 
 -- | Round-trip from local to WGS84 and back is identity (approximately)
 prop_WGS84_and_back :: Geodetic -> Bool
+<<<<<<< HEAD
 prop_WGS84_and_back p = samePlace p $ toLocal ((^. trf) p) $ toWGS84 p
+=======
+prop_WGS84_and_back p = samePlace p $ toLocal (p ^. trf) $ toWGS84 p
+>>>>>>> c5162f79af10ba19aeda66fac966dc31768d576d
 
 
 -- | Sample pairs of points with bearings and distances. 
@@ -197,7 +213,7 @@ prop_offset2 (Distance d) (Bearing h) (Scalar s) = sameOffset go1 go2
 prop_offset3 :: GridOffset -> Bool
 prop_offset3 delta = sameOffset delta0 
                                 (polarOffset (offsetDistance delta0) (offsetBearing delta))
-   where delta0 = delta {deltaAltitude = 0 *~ meter}
+   where delta0 = (deltaAltitudeL .~ (0 *~ meter)) delta
 
 -- | Given a grid point and an offset, applying the offset to the point gives a new point which
 -- is offset from the first point by the argument offset.
@@ -278,8 +294,13 @@ ukTest = Geodetic (Latitude (dms 52 39 27.2531)) (Longitude (dms 1 43 4.5177)) (
 stereoGridN :: GridStereo
 stereoGridN = mkGridStereo tangent origin (0.9999079 *~ one)
    where
+<<<<<<< HEAD
       ellipse = TRF (Ellipsoid (6377397.155 *~ metre) (299.15281 *~ one)) mempty 
       tangent = Geodetic (Latitude (dms 52 9 22.178)) (Longitude (dms 5 23 15.500)) (Altitude (0 *~ meter)) ellipse
+=======
+      ellipse = TRF (Ellipsoid (6377397.155 *~ metre) (299.15281 *~ one)) mempty
+      tangent = Geodetic (dms 52 9 22.178) (dms 5 23 15.500) (0 *~ meter) ellipse
+>>>>>>> c5162f79af10ba19aeda66fac966dc31768d576d
       origin = GridOffset (155000 *~ metre) (463000 *~ metre) (0 *~ meter)
       
       
@@ -290,7 +311,11 @@ stereoGridS :: GridStereo
 stereoGridS = mkGridStereo tangent origin (0.9999079 *~ one)
    where
       ellipse = TRF (Ellipsoid (6377397.155 *~ metre) (299.15281 *~ one)) mempty
+<<<<<<< HEAD
       tangent = Geodetic (Latitude (negate $ dms 52 9 22.178)) (Longitude (dms 5 23 15.500)) (Altitude (0 *~ meter)) ellipse
+=======
+      tangent = Geodetic (negate $ dms 52 9 22.178) (dms 5 23 15.500) (0 *~ meter) ellipse
+>>>>>>> c5162f79af10ba19aeda66fac966dc31768d576d
       origin = GridOffset ((-155000) *~ metre) (463000 *~ metre) (0 *~ meter)
 
 
@@ -299,14 +324,22 @@ stereoGridS = mkGridStereo tangent origin (0.9999079 *~ one)
 stereographicToGridN :: Bool
 stereographicToGridN = sameGrid g1 g1'
    where
+<<<<<<< HEAD
       p1 = Geodetic (Latitude (dms 53 0 0)) (Longitude (dms 6 0 0)) (Altitude (0 *~ meter)) $ gridEllipsoid stereoGridN 
+=======
+      p1 = Geodetic (dms 53 0 0) (dms 6 0 0) (0 *~ meter) $ gridTRF stereoGridN 
+>>>>>>> c5162f79af10ba19aeda66fac966dc31768d576d
       g1 = GridPoint (196105.283 *~ meter) (557057.739 *~ meter) (0 *~ meter) stereoGridN
       g1' = toGrid stereoGridN p1
 
 stereographicFromGridN :: Bool
 stereographicFromGridN = samePlace p1 p1'
    where
+<<<<<<< HEAD
       p1 = Geodetic (Latitude (dms 53 0 0)) (Longitude (dms 6 0 0)) (Altitude (0 *~ meter)) $ gridEllipsoid stereoGridN
+=======
+      p1 = Geodetic (dms 53 0 0) (dms 6 0 0) (0 *~ meter) $ gridTRF stereoGridN
+>>>>>>> c5162f79af10ba19aeda66fac966dc31768d576d
       g1 = GridPoint (196105.283 *~ meter) (557057.739 *~ meter) (0 *~ meter) stereoGridN
       p1' = fromGrid g1      
 
@@ -314,7 +347,11 @@ stereographicFromGridN = samePlace p1 p1'
 stereographicToGridS :: Bool
 stereographicToGridS = sameGrid g1 g1'
    where
+<<<<<<< HEAD
       p1 = Geodetic (Latitude (negate $ dms 53 0 0)) (Longitude (dms 6 0 0)) (Altitude (0 *~ meter)) $ gridEllipsoid stereoGridS
+=======
+      p1 = Geodetic (negate $ dms 53 0 0) (dms 6 0 0) (0 *~ meter) $ gridTRF stereoGridS
+>>>>>>> c5162f79af10ba19aeda66fac966dc31768d576d
       g1 = GridPoint ((-196105.283) *~ meter) (557057.739 *~ meter) (0 *~ meter) stereoGridS
       g1' = toGrid stereoGridS p1
 
@@ -322,7 +359,11 @@ stereographicToGridS = sameGrid g1 g1'
 stereographicFromGridS :: Bool
 stereographicFromGridS = samePlace p1 p1'
    where
+<<<<<<< HEAD
       p1 = Geodetic (Latitude (negate $ dms 53 0 0)) (Longitude (dms 6 0 0)) (Altitude (0 *~ meter)) $ gridEllipsoid stereoGridS
+=======
+      p1 = Geodetic (negate $ dms 53 0 0) (dms 6 0 0) (0 *~ meter) $ gridTRF stereoGridS
+>>>>>>> c5162f79af10ba19aeda66fac966dc31768d576d
       g1 = GridPoint ((-196105.283) *~ meter) (557057.739 *~ meter) (0 *~ meter) stereoGridS
       p1' = fromGrid g1 
 
@@ -331,9 +372,8 @@ stereographicFromGridS = samePlace p1 p1'
 prop_stereographic :: GridPoint GridStereo -> Property
 prop_stereographic p =
    let g = fromGrid p
-       r = toGrid (gridBasis p) g
-   in counterexample ("p = " ++ show p ++ "\ng = " ++ show g ++ "\nr = " ++ show r) $
-     closeGrid p r 
+       r = toGrid (p ^. gridBasis) g
+   in counterexample ("p = " ++ show p ++ "\ng = " ++ show g ++ "\nr = " ++ show r) $ closeGrid p r 
 
 
 
@@ -391,9 +431,15 @@ prop_rayBisect :: Ray -> Altitude -> Bool
 prop_rayBisect r (Altitude height) =
    case bisect ray0 f (1 *~ centi meter) (0 *~ meter) (1000 *~ kilo meter) of
       Nothing -> False
+<< HEAD
       Just d -> let (g, _, _) = pathFunc ray0 d in abs ((^. altitude . _Wrapped') g - height) < 1 *~ centi meter
    where
       f g = compare ((^. altitude . _Wrapped') g) height
+=======
+      Just d -> let (g, _, _) = pathFunc ray0 d in abs ((g ^. altitude) - height) < 1 *~ centi meter
+   where
+      f g = compare (g ^. altitude) height
+>>>>>>> c5162f79af10ba19aeda66fac966dc31768d576d
       ray0 = getRay r
    
 

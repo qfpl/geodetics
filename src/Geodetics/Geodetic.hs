@@ -1,3 +1,5 @@
+{-# LANGUAGE NoImplicitPrelude #-}
+
 module Geodetics.Geodetic (
    -- ** Geodetic Coordinates
    Geodetic (..),
@@ -33,8 +35,8 @@ import Geodetics.Types.Ellipsoid
 import Geodetics.Types.TRF
 import Linear.V3(V3(V3))
 import Numeric.Units.Dimensional.Prelude hiding ((.))
-import Text.ParserCombinators.ReadP
-import qualified Prelude as P
+import Text.ParserCombinators.ReadP(readP_to_S)
+import qualified Prelude as P(abs, round, (*), divMod)
 
 -- | Defines a three-D position on or around the Earth using latitude,
 -- longitude and altitude with respect to a specified ellipsoid, with
@@ -159,10 +161,9 @@ instance Show Geodetic where
 -- * DDDMMSS format with optional leading zeros: 343123.52N, 0461356.43W
 readGroundPosition :: TRF -> String -> Maybe Geodetic
 readGroundPosition e str = 
-   case map fst $ filter (null . snd) $ readP_to_S latLong str of
+   case map fst . filter (null . snd) $ readP_to_S latLong str of
       [] -> Nothing
-      (lat,long) : _ -> Just $ groundPosition $ Geodetic (Latitude (lat *~ degree)) (Longitude (long *~ degree)) undefined e
-      
+      (lat,long) : _ -> Just $ groundPosition $ Geodetic (Latitude (lat *~ degree)) (Longitude (long *~ degree)) undefined e      
       
 -- | Show an angle as degrees, minutes and seconds to two decimal places.
 showAngle :: Angle Double -> String
@@ -184,19 +185,17 @@ showAngle a
          
 -- | The point on the Earth diametrically opposite the argument, with
 -- the same altitude.
-antipode :: Geodetic -> Geodetic
+antipode :: (HasLatitude g, HasLongitude g, HasTRF g, HasAltitude g, HasGeodetic g) => g -> Geodetic
 antipode g = Geodetic lat long (g ^. altitude) (g ^. trf)
    where
       lat = Latitude (negate $ (g ^. latitude . _Wrapped'))
       long' = (g ^. longitude . _Wrapped') - 180 *~ degree
       long | long' < _0  = Longitude (long' + 360 *~ degree)
            | otherwise  = Longitude long' 
-
-   
    
 -- | Convert a geodetic coordinate into earth centered, relative to the
 -- ellipsoid in use.
-geoToEarth :: Geodetic -> ECEF
+geoToEarth :: (HasLatitude l, HasLongitude l, HasTRF l, HasAltitude l, HasGeodetic l) => l -> ECEF
 geoToEarth geo = V3 (
       (n + h) * coslat * coslong)
       ((n + h) * coslat * sinlong)
@@ -212,17 +211,16 @@ geoToEarth geo = V3 (
       sinlong = sin $ geolon
       h = geo ^. altitude . _Wrapped'
 
-
 -- | Convert an earth centred coordinate into a geodetic coordinate on 
 -- the specified geoid.
 --
 -- Uses the closed form solution of H. Vermeille: Direct
 -- transformation from geocentric coordinates to geodetic coordinates.
 -- Journal of Geodesy Volume 76, Number 8 (2002), 451-454
-earthToGeo :: TRF -> ECEF -> (Angle Double, Angle Double, Length Double)
+earthToGeo :: HasTRF a => a -> ECEF -> (Angle Double, Angle Double, Length Double)
 earthToGeo e (V3 x y z) = (phi, atan2 y x, sqrt (l ^ pos2 + p2) - norm)
    where
-      -- Naming: numeric suffix inicates power. Hence x2 = x * x, x3 = x2 * x, etc.
+      -- Naming: numeric suffix indicates power. Hence x2 = x * x, x3 = x2 * x, etc.
       p2 = x ^ pos2 + y ^ pos2
       a = (^. majorRadius) e
       a2 = a ^ pos2
@@ -258,7 +256,7 @@ toWGS84 g = Geodetic (Latitude lat) (Longitude lon) alt _WGS84
    where
       alt = g ^. altitude
       (lat, lon, _) = earthToGeo _WGS84 $ applyHelmert h $ geoToEarth g
-      h = (^. helmert) (g ^. trf)
+      h = g ^. trf . helmert
 
 
 -- | The absolute distance in a straight line between two geodetic 

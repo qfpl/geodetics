@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
 -- | Distinguished coordinate systems for the United Kingdom.
@@ -9,6 +10,7 @@ module Geodetics.UK (
    toUkGridReference
 ) where
 
+<<<<<<< HEAD
 import Control.Applicative
 import Control.Monad
 import Data.Array
@@ -21,10 +23,47 @@ import Geodetics.Types.Altitude
 import Geodetics.Types.Latitude
 import Geodetics.Types.Longitude
 import Geodetics.Types.TRF
+=======
+import Control.Applicative()
+import Control.Lens((^.))
+import Control.Monad(guard)
+import Data.Array(Array, inRange, (!), listArray)
+import Data.Char(ord)
+import Geodetics.Geodetic(Geodetic(Geodetic))
+import Geodetics.Grid(GridClass, GridOffset(GridOffset), GridPoint(GridPoint), toGrid, fromGrid, gridTRF, unsafeGridCoerce, fromGridDigits, applyOffset, toGridDigits, eastings, northings)
+import Geodetics.Ellipsoids
+import Geodetics.TransverseMercator(GridTM, mkGridTM)
+>>>>>>> c5162f79af10ba19aeda66fac966dc31768d576d
 import Numeric.Units.Dimensional.Prelude
-import qualified Prelude as P
+import qualified Prelude as P((-))
 
 
+<<<<<<< HEAD
+=======
+
+-- | TRF definition for Great Britain. Airy 1830 offset from the centre of the Earth 
+-- and rotated slightly.
+-- 
+-- The Helmert parameters are from the Ordnance Survey document 
+-- \"A Guide to Coordinate Systems in Great Britain\", which notes that it
+-- can be in error by as much as 5 meters and should not be used in applications
+-- requiring greater accuracy.  A more precise conversion requires a large table 
+-- of corrections for historical inaccuracies in the triangulation of the UK.
+_OSGB36 ::
+  TRF
+_OSGB36 =
+   TRF
+    (
+      Ellipsoid
+        (6377563.396 *~ meter)
+        (299.3249646 *~ one)
+    )
+    (Helmert 
+       (446.448 *~ meter) ((-125.157) *~ meter) (542.06 *~ meter)
+       ((-20.4894) *~ one)
+       (0.1502 *~ arcsecond) (0.247 *~ arcsecond) (0.8421 *~ arcsecond))
+
+>>>>>>> c5162f79af10ba19aeda66fac966dc31768d576d
 -- | The UK National Grid is a Transverse Mercator projection with a true origin at
 -- 49 degrees North, 2 degrees West on OSGB36, and a false origin 400km West and 100 km North of
 -- the true origin. The scale factor is defined as @10**(0.9998268 - 1)@.
@@ -33,7 +72,7 @@ data UkNationalGrid = UkNationalGrid deriving (Eq, Show)
 instance GridClass UkNationalGrid where
    toGrid _ = unsafeGridCoerce UkNationalGrid . toGrid ukGrid
    fromGrid = fromGrid . unsafeGridCoerce ukGrid
-   gridEllipsoid _ = _OSGB36
+   gridTRF _ = _OSGB36
 
 
 ukTrueOrigin :: Geodetic
@@ -112,8 +151,8 @@ toUkGridReference :: Int -> GridPoint UkNationalGrid -> Maybe String
 toUkGridReference n p
    | n < 0         = error "toUkGridReference: precision argument must not be negative."
    | otherwise     = do
-      (gx, strEast) <- toGridDigits ukGridSquare n $ eastings p + 1000 *~ kilo meter
-      (gy, strNorth) <- toGridDigits ukGridSquare n $ northings p + 500 *~ kilo meter
+      (gx, strEast) <- toGridDigits ukGridSquare n $ (p ^. eastings) + 1000 *~ kilo meter
+      (gy, strNorth) <- toGridDigits ukGridSquare n $ (p ^. northings) + 500 *~ kilo meter
       let (gx1, gx2) = (fromIntegral gx) `divMod` 5
           (gy1, gy2) = (fromIntegral gy) `divMod` 5
       guard (gx1 < 5 && gy1 < 5)

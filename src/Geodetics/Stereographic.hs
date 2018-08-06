@@ -1,3 +1,5 @@
+{-# LANGUAGE NoImplicitPrelude #-}
+
 {- |
 The following is based on equations in Section 1.4.7.1 in 
 OGP Surveying and Positioning Guidance Note number 7, part 2 – August 2006
@@ -6,51 +8,159 @@ OGP Surveying and Positioning Guidance Note number 7, part 2 – August 2006
 
 {-# LANGUAGE MultiParamTypeClasses, FlexibleInstances #-}
 module Geodetics.Stereographic (
-   GridStereo (gridTangent, gridOrigin, gridScale),
+   GridStereo(..),
+   HasGridStereo(..),
    mkGridStereo
 ) where
 
-import Control.Lens((^.), _Wrapped')
+import Control.Lens(Lens', (^.), _Wrapped')
 import Geodetics.Ellipsoids
 import Geodetics.Geodetic
 import Geodetics.Grid
+import Geodetics.GridScale
 import Geodetics.Types.Altitude
 import Geodetics.Types.Latitude
 import Geodetics.Types.Longitude
+import Geodetics.Types.Ellipsoid
 import Geodetics.Types.TRF
 import Numeric.Units.Dimensional.Prelude
-import Prelude ()
 
 
 -- | A stereographic projection with its origin at an arbitrary point on Earth, other than the poles.
-data GridStereo = GridStereo {
-      gridTangent :: Geodetic, -- ^ Point where the plane of projection touches the ellipsoid. Often known as the Natural Origin.
-      gridOrigin :: GridOffset,  -- ^ Grid position of the tangent point. Often known as the False Origin.
-      gridScale :: Dimensionless Double, -- ^ Scaling factor that balances the distortion between the center and the edges. 
+data GridStereo = GridStereo
+      Geodetic -- Point where the plane of projection touches the ellipsoid. Often known as the Natural Origin.
+      GridOffset  -- Grid position of the tangent point. Often known as the False Origin.
+      (Dimensionless Double) -- Scaling factor that balances the distortion between the center and the edges. 
                                          -- Should be slightly less than unity.
       
       -- Memoised parameters derived from the tangent point.
-      gridR :: Length Double,
-      gridN, gridC, gridSin, gridCos :: Dimensionless Double,
-      gridLatC :: Angle Double,
-      gridG, gridH :: Length Double
-   } deriving (Show)
-   
+      (Length Double)
+      (Dimensionless Double)
+      (Dimensionless Double)
+      (Dimensionless Double)
+      (Dimensionless Double)
+      (Angle Double)
+      (Length Double)
+      (Length Double)
+   deriving (Show)
+
+class HasGridStereo a where
+   gridStereo ::
+     Lens' a GridStereo
+   gridRL ::
+     Lens' a (Length Double)
+   gridNL :: 
+     Lens' a (Dimensionless Double)
+   gridCL :: 
+     Lens' a (Dimensionless Double)
+   gridSinL :: 
+     Lens' a (Dimensionless Double)
+   gridCosL :: 
+     Lens' a (Dimensionless Double)
+   gridLatCL :: 
+     Lens' a (Angle Double)
+   gridGL :: 
+     Lens' a (Length Double)
+   gridHL :: 
+     Lens' a (Length Double)
+   gridRL =
+      gridStereo . gridRL
+   {-# INLINE gridRL #-}
+   gridNL =
+      gridStereo . gridNL
+   {-# INLINE gridNL #-}
+   gridCL =
+      gridStereo . gridCL
+   {-# INLINE gridCL #-}
+   gridSinL =
+      gridStereo . gridSinL
+   {-# INLINE gridSinL #-}
+   gridCosL =
+      gridStereo . gridCosL
+   {-# INLINE gridCosL #-}
+   gridLatCL =
+      gridStereo . gridLatCL
+   {-# INLINE gridLatCL #-}
+   gridGL =
+      gridStereo . gridGL
+   {-# INLINE gridGL #-}
+   gridHL =
+      gridStereo . gridHL
+   {-# INLINE gridHL #-}
+
+instance HasGridScale GridStereo where
+   gridScale k (GridStereo t o s r dn dc dsin dcos c g h) =
+      fmap (\x -> GridStereo t o x r dn dc dsin dcos c g h) (k s)
+   {-# INLINE gridScale #-}
+
+instance HasGridStereo GridStereo where
+   gridStereo =
+      id
+   gridRL k (GridStereo t o s r dn dc dsin dcos c g h) =
+      fmap (\x -> GridStereo t o s x dn dc dsin dcos c g h) (k r)
+   {-# INLINE gridRL #-}
+   gridNL k (GridStereo t o s r dn dc dsin dcos c g h) =
+      fmap (\x -> GridStereo t o s r x dc dsin dcos c g h) (k dn)
+   {-# INLINE gridNL #-}
+   gridCL k (GridStereo t o s r dn dc dsin dcos c g h) =
+      fmap (\x -> GridStereo t o s r dn x dsin dcos c g h) (k dc)
+   {-# INLINE gridCL #-}
+   gridSinL k (GridStereo t o s r dn dc dsin dcos c g h) =
+      fmap (\x -> GridStereo t o s r dn dc x dcos c g h) (k dsin)
+   {-# INLINE gridSinL #-}
+   gridCosL k (GridStereo t o s r dn dc dsin dcos c g h) =
+      fmap (\x -> GridStereo t o s r dn dc dsin x c g h) (k dcos)
+   {-# INLINE gridCosL #-}
+   gridLatCL k (GridStereo t o s r dn dc dsin dcos c g h) =
+      fmap (\x -> GridStereo t o s r dn dc dsin dcos x g h) (k c)
+   {-# INLINE gridLatCL #-}
+   gridGL k (GridStereo t o s r dn dc dsin dcos c g h) =
+      fmap (\x -> GridStereo t o s r dn dc dsin dcos c x h) (k g)
+   {-# INLINE gridGL #-}
+   gridHL k (GridStereo t o s r dn dc dsin dcos c g h) =
+      fmap (\x -> GridStereo t o s r dn dc dsin dcos c g x) (k h)
+   {-# INLINE gridHL #-}
+
+instance HasGeodetic GridStereo where
+   geodetic k (GridStereo t o s r dn dc dsin dcos c g h) =
+      fmap (\x -> GridStereo x o s r dn dc dsin dcos c g h) (k t)
+
+instance HasAltitude GridStereo where
+   altitude =
+      geodetic . altitude
+
+instance HasLatitude GridStereo where
+   latitude =
+      geodetic . latitude
+
+instance HasLongitude GridStereo where
+   longitude =
+      geodetic . longitude
+
+instance GetTRF GridStereo where
+instance FoldTRF GridStereo where
+instance ManyTRF GridStereo where
+instance SetTRF GridStereo where
+instance GetEllipsoid GridStereo where
+instance FoldEllipsoid GridStereo where
+instance ManyEllipsoid GridStereo where
+instance SetEllipsoid GridStereo where
+
+instance HasEllipsoid GridStereo where
+   ellipsoid =
+      geodetic . ellipsoid
+
+instance HasTRF GridStereo where
+   trf =
+      geodetic . trf
+
+instance HasGridOffset GridStereo where
+   gridOffsetL k (GridStereo t o s r dn dc dsin dcos c g h) =
+      fmap (\x -> GridStereo t x s r dn dc dsin dcos c g h) (k o)
+
 -- | Create a stereographic projection. The tangency point must not be one of the poles.  
 mkGridStereo :: Geodetic -> GridOffset -> Dimensionless Double -> GridStereo
-mkGridStereo tangent origin scale = GridStereo {
-      gridTangent = tangent,
-      gridOrigin = origin,
-      gridScale = scale,
-      gridR = r,
-      gridN = n,
-      gridC = c,
-      gridSin = sinLatC1,
-      gridCos = sqrt $ _1 - sinLatC1 * sinLatC1,
-      gridLatC = asin sinLatC1,
-      gridG = g,
-      gridH = h
-   }
+mkGridStereo tangent origin scale = GridStereo tangent origin scale r n c sinLatC1 (sqrt $ _1 - sinLatC1 * sinLatC1) (asin sinLatC1) g h
    where 
       -- The reference seems to use χO to refer to two slightly different values. 
       -- Here these will be called LatC0 and LatC1.
@@ -76,7 +186,7 @@ mkGridStereo tangent origin scale = GridStereo {
       
 
 instance GridClass GridStereo where
-   toGrid grid geo = applyOffset (gridOrigin grid) $ GridPoint east north (geo ^. altitude . _Wrapped') grid
+   toGrid grid geo = applyOffset (grid ^. gridOffsetL) $ GridPoint undefined {- east -} undefined {- north -} (geo ^. altitude . _Wrapped') grid
       where
          op :: Num a => Quantity d a -> Quantity d a    -- Values of longitude, tangent longitude, E and N
          op = if ((gridTangent grid) ^. latitude . _Wrapped') < _0 then negate else id  -- must be negated in the southern hemisphere.
@@ -113,13 +223,13 @@ instance GridClass GridStereo where
          latC = gridLatC grid + _2 * atan2 (north' - east' * tan (j/_2)) (_2 * gridR grid * gridScale grid)
          longC = j + _2 * i + long0
          sinLatC = sin latC
-         long = (longC - long0) / gridN grid + long0
-         isoLat = log ((_1 + sinLatC) / (gridC grid * (_1 - sinLatC))) / (_2 * gridN grid)
+         long = (longC - long0) / (grid ^. gridNL) + long0
+         isoLat = log ((_1 + sinLatC) / ((grid ^. gridCL) * (_1 - sinLatC))) / (_2 * (grid ^. gridNL))
          lat1 = _2 * atan (exp isoLat) - pi/_2
          next lat = lat - (isoN - isoLat) * cos lat * (_1 - e2 * sin lat ^ pos2) / (_1 - e2)
-            where isoN = isometricLatitude (gridEllipsoid grid) lat
-                  e2 = eccentricity2 $ gridEllipsoid grid
+            where isoN = isometricLatitude (gridTRF grid) lat
+                  e2 = eccentricity2 $ gridTRF grid
          lats = iterate next lat1
-         latN = snd $ head $ dropWhile (\(v1, v2) -> abs (v1-v2) > 0.01 *~ arcsecond) $ zip lats $ tail lats 
+         latN = snd . head . dropWhile (\(v1, v2) -> abs (v1-v2) > 0.01 *~ arcsecond) . zip lats . tail $ lats 
             
-   gridEllipsoid = (^. trf) . gridTangent
+   gridTRF = (^. trf) . gridTangent

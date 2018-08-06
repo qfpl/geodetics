@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE TypeOperators, TypeFamilies, FlexibleContexts #-}
 -- | The implementation assumes IEEE 754 arithmetic.
 
@@ -14,8 +15,6 @@ import Geodetics.Types.Ellipsoid
 import Geodetics.Types.TRF
 import Linear.V3(V3(V3))
 import Numeric.Units.Dimensional.Prelude
-import Prelude ()
-
 
 -- | Lower and upper exclusive bounds within which a path is valid. 
 type PathValidity = (Length Double, Length Double)
@@ -143,7 +142,7 @@ intersect d1 d2 accuracy n path1 path2
       gcDist norm v1 v2 = 
          let c = v1 `cross3` v2 
          in (if c `dot3` norm < _0 then negate else id) $ atan2 (mag3 c) (v1 `dot3` v2) 
-      r = (^. majorRadius) (pt1 ^. trf)
+      r = pt1 ^. trf . majorRadius 
           
 {- Note on derivation of "intersect"
 
@@ -176,7 +175,8 @@ is taken as the basis for the next approximation.
 
 -- | A ray from a point heading in a straight line in 3 dimensions. 
 rayPath ::
-   Geodetic            -- ^ Start point.
+   (HasLatitude g, HasLongitude g, HasTRF g, HasAltitude g, HasGeodetic g) =>
+   g            -- ^ Start point.
    -> Angle Double     -- ^ Bearing.
    -> Angle Double     -- ^ Elevation.
    -> Path
@@ -222,7 +222,8 @@ rayPath pt1 bearing elevation = Path ray alwaysValid
 -- by G.H. Kaplan, U.S. Naval Observatory. Except for points close to the poles 
 -- the approximation is accurate to within a few meters over 1000km.
 rhumbPath ::
-   Geodetic              -- ^ Start point.
+  (HasLatitude g, HasLongitude g, HasTRF g, HasGeodetic g) =>
+   g              -- ^ Start point.
    -> Angle Double       -- ^ Course.
    -> Path
 rhumbPath pt course = Path rhumb validity
@@ -260,7 +261,8 @@ rhumbPath pt course = Path rhumb validity
 --
 -- This is equivalent to @rhumbPath pt (pi/2)@
 latitudePath ::
-   Geodetic             -- ^ Start point.
+   (HasLongitude g, HasLatitude g, HasTRF g, HasGeodetic g) => 
+   g             -- ^ Start point.
    -> Path
 latitudePath pt = Path line alwaysValid
    where
