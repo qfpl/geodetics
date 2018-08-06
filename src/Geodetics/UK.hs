@@ -16,31 +16,14 @@ import Data.Char
 import Data.Monoid
 import Geodetics.Geodetic
 import Geodetics.Grid
-import Geodetics.Ellipsoids
 import Geodetics.TransverseMercator
+import Geodetics.Types.Altitude
+import Geodetics.Types.Latitude
+import Geodetics.Types.Longitude
+import Geodetics.Types.TRF
 import Numeric.Units.Dimensional.Prelude
 import qualified Prelude as P
 
-
-
--- | Ellipsoid definition for Great Britain. Airy 1830 offset from the centre of the Earth 
--- and rotated slightly.
--- 
--- The Helmert parameters are from the Ordnance Survey document 
--- \"A Guide to Coordinate Systems in Great Britain\", which notes that it
--- can be in error by as much as 5 meters and should not be used in applications
--- requiring greater accuracy.  A more precise conversion requires a large table 
--- of corrections for historical inaccuracies in the triangulation of the UK.
-_OSGB36 ::
-  Ellipsoid
-_OSGB36 =
-   Ellipsoid
-     (6377563.396 *~ meter)
-     (299.3249646 *~ one)
-     (Helmert 
-      (446.448 *~ meter) ((-125.157) *~ meter) (542.06 *~ meter)
-      ((-20.4894) *~ one)
-      (0.1502 *~ arcsecond) (0.247 *~ arcsecond) (0.8421 *~ arcsecond))
 
 -- | The UK National Grid is a Transverse Mercator projection with a true origin at
 -- 49 degrees North, 2 degrees West on OSGB36, and a false origin 400km West and 100 km North of
@@ -56,9 +39,9 @@ instance GridClass UkNationalGrid where
 ukTrueOrigin :: Geodetic
 ukTrueOrigin =
   Geodetic
-    (49 *~ degree)
-    ((-2) *~ degree)
-    (0 *~ meter)
+    (Latitude (49 *~ degree))
+    (Longitude ((-2) *~ degree))
+    (Altitude (0 *~ meter))
     (_OSGB36)
 
 ukFalseOrigin :: GridOffset 

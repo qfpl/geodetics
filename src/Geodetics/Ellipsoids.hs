@@ -14,14 +14,8 @@ module Geodetics.Ellipsoids (
    ECEF,
    applyHelmert,
    -- ** Ellipsoid models of the Geoid
-   Ellipsoid (..),
-   majorRadius,
-   flatR,
-   helmert,
-   HasEllipsoid(..),
    helmertFromWSG84,
    helmertToWSG84,
-   _WGS84,
    flattening,
    minorRadius,
    eccentricity2,
@@ -45,13 +39,14 @@ module Geodetics.Ellipsoids (
    cross3
 ) where
 
-import Control.Lens(Lens', (^.))
+import Control.Lens((^.))
 import Control.Monad.Zip(MonadZip(mzipWith))
-import Data.Monoid (Monoid)
-import Data.Semigroup (Semigroup, (<>))
 import Linear.V3(V3(V3))
 import Numeric.Units.Dimensional
 import Numeric.Units.Dimensional.Prelude
+import Geodetics.Types.Ellipsoid
+import Geodetics.Types.Helmert
+import Geodetics.Types.TRF
 import Prelude ()  -- Numeric instances.
 
 
@@ -107,144 +102,11 @@ cross3 :: (Num a) =>
 cross3 (V3 x1 y1 z1) (V3 x2 y2 z2) = V3 (y1*z2 - z1*y2) (z1*x2 - x1*z2) (x1*y2 - y1*x2)
 
 
--- | The 7 parameter Helmert transformation. The monoid instance allows composition.
-data Helmert = Helmert
-   (Length Double)
-   (Length Double)
-   (Length Double)
-   (Dimensionless Double)  -- ^ Parts per million
-   (Dimensionless Double)
-   (Dimensionless Double)
-   (Dimensionless Double)
-   deriving (Eq, Show)
-
-cX ::
-  HasHelmert a =>
-  a
-  -> Length Double
-cX =
-   (^. cXL)
-
-cY ::
-  HasHelmert a =>
-  a
-  -> Length Double
-cY =
-   (^. cYL)
-
-cZ ::
-  HasHelmert a =>
-  a
-  -> Length Double
-cZ =
-   (^. cZL)
-
-helmertScale ::
-  HasHelmert a =>
-  a
-  -> Dimensionless Double
-helmertScale =
-   (^. helmertScaleL)
-
-rX ::
-  HasHelmert a =>
-  a
-  -> Dimensionless Double
-rX =
-   (^. rXL)
-
-rY ::
-  HasHelmert a =>
-  a
-  -> Dimensionless Double
-rY =
-   (^. rYL)
-
-rZ ::
-  HasHelmert a =>
-  a
-  -> Dimensionless Double
-rZ =
-   (^. rZL)
-
-class HasHelmert a where
-   helmertL ::
-     Lens' a Helmert
-   cXL ::
-     Lens' a (Length Double)
-   {-# INLINE cXL #-}
-   cYL ::
-     Lens' a (Length Double)
-   {-# INLINE cYL #-}
-   cZL ::
-     Lens' a (Length Double)
-   {-# INLINE cZL #-}
-   helmertScaleL ::
-     Lens' a (Dimensionless Double)
-   {-# INLINE helmertScaleL #-}
-   rXL ::
-     Lens' a (Dimensionless Double)
-   {-# INLINE rXL #-}
-   rYL ::
-     Lens' a (Dimensionless Double)
-   {-# INLINE rYL #-}
-   rZL ::
-     Lens' a (Dimensionless Double)
-   {-# INLINE rZL #-}
-   cXL =
-      helmertL . cXL
-   cYL =
-      helmertL . cYL
-   cZL =
-      helmertL . cZL
-   helmertScaleL =
-      helmertL . helmertScaleL
-   rXL =
-      helmertL . rXL
-   rYL =
-      helmertL . rYL
-   rZL =
-      helmertL . rZL
-
-instance HasHelmert Helmert where
-   {-# INLINE cXL #-}
-   {-# INLINE cYL #-}
-   {-# INLINE cZL #-}
-   {-# INLINE helmertScaleL #-}
-   {-# INLINE rXL #-}
-   {-# INLINE rYL #-}
-   {-# INLINE rZL #-}
-   helmertL =
-      id
-   cXL k (Helmert cX' cY' cZ' helmertScale' rX' rY' rZ') =
-      fmap (\x -> Helmert x cY' cZ' helmertScale' rX' rY' rZ') (k cX')
-   cYL k (Helmert cX' cY' cZ' helmertScale' rX' rY' rZ') =
-      fmap (\x -> Helmert cX' x cZ' helmertScale' rX' rY' rZ') (k cY')
-   cZL k (Helmert cX' cY' cZ' helmertScale' rX' rY' rZ') =
-      fmap (\x -> Helmert cX' cY' x helmertScale' rX' rY' rZ') (k cZ')
-   helmertScaleL k (Helmert cX' cY' cZ' helmertScale' rX' rY' rZ') =
-      fmap (\x -> Helmert cX' cY' cZ' x rX' rY' rZ') (k helmertScale')
-   rXL k (Helmert cX' cY' cZ' helmertScale' rX' rY' rZ') =
-      fmap (\x -> Helmert cX' cY' cZ' helmertScale' x rY' rZ') (k rX')
-   rYL k (Helmert cX' cY' cZ' helmertScale' rX' rY' rZ') =
-      fmap (\x -> Helmert cX' cY' cZ' helmertScale' rX' x rZ') (k rY')
-   rZL k (Helmert cX' cY' cZ' helmertScale' rX' rY' rZ') =
-      fmap (\x -> Helmert cX' cY' cZ' helmertScale' rX' rY' x) (k rZ')
-
-instance Semigroup Helmert where
-    h1 <> h2 = Helmert (cX h1 + cX h2) (cY h1 + cY h2) (cZ h1 + cZ h2)
-                       (helmertScale h1 + helmertScale h2)
-                       (rX h1 + rX h2) (rY h1 + rY h2) (rZ h1 + rZ h2)
-
-instance Monoid Helmert where
-   mempty = Helmert (0 *~ meter) (0 *~ meter) (0 *~ meter) _0 _0 _0 _0
-   mappend = (<>)
-
 -- | The inverse of a Helmert transformation.
 inverseHelmert :: Helmert -> Helmert
-inverseHelmert h = Helmert (negate $ cX h) (negate $ cY h) (negate $ cZ h) 
-                           (negate $ helmertScale h) 
-                           (negate $ rX h) (negate $ rY h) (negate $ rZ h)
+inverseHelmert h = Helmert (negate $ (^. cX) h) (negate $ (^. cY) h) (negate $ (^. cZ) h) 
+                           (negate $ (^. helmertScale) h) 
+                           (negate $ (^. rX) h) (negate $ (^. rY) h) (negate $ (^. rZ) h)
 
 
 -- | Earth-centred, Earth-fixed coordinates as a vector. The origin and axes are
@@ -254,96 +116,19 @@ type ECEF = V3 (Length Double)
 -- | Apply a Helmert transformation to earth-centered coordinates.
 applyHelmert:: Helmert -> ECEF -> ECEF
 applyHelmert h (V3 x y z) = V3 (
-      cX h + s * (                x - rZ h * y + rY h * z))
-      (cY h + s * (        rZ h  * x +        y - rX h * z))
-      (cZ h + s * (negate (rY h) * x + rX h * y +        z))
+      (^. cX) h + s * (                x - (^. rZ) h * y + (^. rY) h * z))
+      ((^. cY) h + s * (        (^. rZ) h  * x +        y - (^. rX) h * z))
+      ((^. cZ) h + s * (negate ((^. rY) h) * x + (^. rX) h * y +        z))
    where
-      s = _1 + helmertScale h * (1e-6 *~ one)
+      s = _1 + (^. helmertScale) h * (1e-6 *~ one)
 
-
--- | An Ellipsoid is defined by the major radius and the inverse flattening (which define its shape), 
--- and its Helmert transform relative to WGS84 (which defines its position and orientation).
---
--- The inclusion of the Helmert parameters relative to WGS84 actually make this a Terrestrial 
--- Reference Frame (TRF), but the term "Ellipsoid" will be used in this library for readability.
---
--- Minimum definition: @majorRadius@, @flatR@ & @helmert@.
--- 
--- Laws:
--- 
--- > helmertToWGS84 = applyHelmert . helmert
--- > helmertFromWGS84 e . helmertToWGS84 e = id
-data Ellipsoid =
-   Ellipsoid
-      (Length Double)         -- majorRadius
-      (Dimensionless Double)  -- flatR
-      Helmert                 -- helmert
-   deriving (Eq, Show)
-
-majorRadius ::
-  HasEllipsoid e =>
-  e
-  -> Length Double
-majorRadius =
-   (^. majorRadiusL)
-
-flatR ::
-  HasEllipsoid e =>
-  e
-  -> Dimensionless Double
-flatR =
-   (^. flatRL)
-
-helmert ::
-  HasHelmert e =>
-  e
-  -> Helmert
-helmert =
-   (^. helmertL)
-
-class HasEllipsoid a where
-   ellipsoid ::   
-      Lens' a Ellipsoid
-   majorRadiusL ::
-      Lens' a (Length Double)
-   {-# INLINE majorRadiusL #-}
-   flatRL ::
-      Lens' a (Dimensionless Double)
-   {-# INLINE flatRL #-}
-   majorRadiusL =
-      ellipsoid . majorRadiusL
-   flatRL =  
-      ellipsoid . flatRL
-
-instance HasEllipsoid Ellipsoid where
-   {-# INLINE majorRadiusL #-}
-   {-# INLINE flatRL #-}
-   ellipsoid =
-      id
-   majorRadiusL k (Ellipsoid r f h) =
-      fmap (\r' -> Ellipsoid r' f h) (k r)
-   flatRL k (Ellipsoid r f h) =
-      fmap (\f' -> Ellipsoid r f' h) (k f)
-
-instance HasHelmert Ellipsoid where
-   helmertL k (Ellipsoid r f h) =
-      fmap (\h' -> Ellipsoid r f h') (k h)
-
-_WGS84 ::
-  Ellipsoid
-_WGS84 =
-   Ellipsoid
-      (6378137.0 *~ meter)
-      (298.257223563 *~ one)
-      mempty
-
-helmertToWSG84 :: Ellipsoid -> ECEF -> ECEF
+helmertToWSG84 :: TRF -> ECEF -> ECEF
    -- ^ The Helmert transform that will convert a position wrt 
    -- this ellipsoid into a position wrt WGS84.
-helmertToWSG84 e = applyHelmert (helmert e)
-helmertFromWSG84 :: Ellipsoid -> ECEF -> ECEF
+helmertToWSG84 e = applyHelmert ((^. helmert) e)
+helmertFromWSG84 :: TRF -> ECEF -> ECEF
    -- ^ And its inverse.
-helmertFromWSG84 e = applyHelmert (inverseHelmert $ helmert e)
+helmertFromWSG84 e = applyHelmert (inverseHelmert $ (^. helmert) e)
 
 -- | The WGS84 geoid, major radius 6378137.0 meters, flattening = 1 / 298.257223563
 -- as defined in \"Technical Manual DMA TM 8358.1 - Datums, Ellipsoids, Grids, and 
@@ -354,48 +139,48 @@ helmertFromWSG84 e = applyHelmert (inverseHelmert $ helmert e)
 
    
 -- | Flattening (f) of an ellipsoid.
-flattening :: Ellipsoid -> Dimensionless Double
-flattening e = _1 / flatR e
+flattening :: TRF -> Dimensionless Double
+flattening e = _1 / (^. flatR) e
 
 -- | The minor radius of an ellipsoid.
-minorRadius :: Ellipsoid -> Length Double
-minorRadius e = majorRadius e * (_1 - flattening e)
+minorRadius :: TRF -> Length Double
+minorRadius e = (^. majorRadius) e * (_1 - flattening e)
 
 
 -- | The eccentricity squared of an ellipsoid.
-eccentricity2 :: Ellipsoid -> Dimensionless Double
+eccentricity2 :: TRF -> Dimensionless Double
 eccentricity2 e = _2 * f - (f * f) where f = flattening e
 
 -- | The second eccentricity squared of an ellipsoid.
-eccentricity'2 :: Ellipsoid -> Dimensionless Double
+eccentricity'2 :: TRF -> Dimensionless Double
 eccentricity'2 e = (f * (_2 - f)) / (_1 - f * f) where f = flattening e
 
 
 -- | Distance from the surface at the specified latitude to the 
 -- axis of the Earth straight down. Also known as the radius of 
 -- curvature in the prime vertical, and often denoted @N@.
-normal :: Ellipsoid -> Angle Double -> Length Double
-normal e lat = majorRadius e / sqrt (_1 - eccentricity2 e * sin lat ^ pos2)
+normal :: TRF -> Angle Double -> Length Double
+normal e lat = (^. majorRadius) e / sqrt (_1 - eccentricity2 e * sin lat ^ pos2)
 
 
 -- | Radius of the circle of latitude: the distance from a point 
 -- at that latitude to the axis of the Earth.
-latitudeRadius :: Ellipsoid -> Angle Double -> Length Double
+latitudeRadius :: TRF -> Angle Double -> Length Double
 latitudeRadius e lat = normal e lat * cos lat
 
 
 -- | Radius of curvature in the meridian at the specified latitude. 
 -- Often denoted @M@.
-meridianRadius :: Ellipsoid -> Angle Double -> Length Double
+meridianRadius :: TRF -> Angle Double -> Length Double
 meridianRadius e lat = 
-   majorRadius e * (_1 - eccentricity2 e) 
+   (^. majorRadius) e * (_1 - eccentricity2 e) 
    / sqrt ((_1 - eccentricity2 e * sin lat ^ pos2) ^ pos3)
    
 
 -- | Radius of curvature of the ellipsoid perpendicular to the meridian at the specified latitude.
-primeVerticalRadius :: Ellipsoid -> Angle Double -> Length Double
+primeVerticalRadius :: TRF -> Angle Double -> Length Double
 primeVerticalRadius e lat =
-   majorRadius e / sqrt (_1 - eccentricity2 e * sin lat ^ pos2)
+   (^. majorRadius) e / sqrt (_1 - eccentricity2 e * sin lat ^ pos2)
 
 
 -- | The isometric latitude. The isometric latitude is conventionally denoted by ψ 
@@ -404,7 +189,7 @@ primeVerticalRadius e lat =
 -- Mercator projection. The name "isometric" arises from the fact that at any point 
 -- on the ellipsoid equal increments of ψ and longitude λ give rise to equal distance 
 -- displacements along the meridians and parallels respectively.
-isometricLatitude :: Ellipsoid -> Angle Double -> Angle Double
+isometricLatitude :: TRF -> Angle Double -> Angle Double
 isometricLatitude ellipse lat = atanh sinLat - e * atanh (e * sinLat)
    where
       sinLat = sin lat

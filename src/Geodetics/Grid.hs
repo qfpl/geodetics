@@ -19,14 +19,14 @@ module Geodetics.Grid (
    toGridDigits
 ) where
 
-import Control.Lens((^.))
+import Control.Lens((^.), _Wrapped')
 import Data.Char
 import Data.Function
 import Data.Monoid (Monoid)
 import Data.Semigroup (Semigroup, (<>))
-import Geodetics.Altitude
 import Geodetics.Geodetic
-import Geodetics.Ellipsoids
+import Geodetics.Types.Altitude
+import Geodetics.Types.TRF
 import Numeric.Units.Dimensional.Prelude hiding ((.))
 import qualified Prelude as P
 
@@ -39,7 +39,7 @@ import qualified Prelude as P
 class GridClass r where
    fromGrid :: GridPoint r -> Geodetic
    toGrid :: r -> Geodetic -> GridPoint r
-   gridEllipsoid :: r -> Ellipsoid
+   gridEllipsoid :: r -> TRF
 
 
 -- | A point on the specified grid. 
@@ -57,7 +57,7 @@ instance Eq (GridPoint r) where
 
 instance HasAltitude (GridPoint g) where
    altitude k (GridPoint e n a b) = 
-      fmap (\x -> GridPoint e n x b) (k a)
+      fmap (\(Altitude x) -> GridPoint e n x b) (k (Altitude a))
 
 
 
@@ -105,7 +105,7 @@ offsetNegate off = GridOffset (negate $ deltaEast off)
 applyOffset :: GridOffset -> GridPoint g -> GridPoint g
 applyOffset off p = GridPoint (eastings p + deltaEast off) 
                            (northings p + deltaNorth off)
-                           (p ^. altitude + deltaAltitude off)
+                           (p ^. altitude . _Wrapped' + deltaAltitude off)
                            (gridBasis p)
 
 
@@ -129,7 +129,7 @@ offsetBearing off = atan2 (deltaEast off) (deltaNorth off)
 gridOffset :: GridPoint g -> GridPoint g -> GridOffset
 gridOffset p1 p2 = GridOffset (eastings p2 - eastings p1)
                               (northings p2 - northings p1)
-                              (p2 ^. altitude - p1 ^. altitude)
+                              (p2 ^. altitude . _Wrapped' - p1 ^. altitude . _Wrapped')
 
 
 -- | Coerce a grid point of one type into a grid point of a different type, 
@@ -139,7 +139,7 @@ gridOffset p1 p2 = GridOffset (eastings p2 - eastings p1)
 -- It should be used only to convert between distinguished grids (e.g. "UkNationalGrid") and
 -- their equivalent numerical definitions.
 unsafeGridCoerce :: b -> GridPoint a -> GridPoint b
-unsafeGridCoerce base p = GridPoint (eastings p) (northings p) (p ^. altitude) base
+unsafeGridCoerce base p = GridPoint (eastings p) (northings p) (p ^. altitude . _Wrapped') base
 
 
 

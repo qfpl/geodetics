@@ -10,13 +10,14 @@ module Geodetics.Stereographic (
    mkGridStereo
 ) where
 
-import Control.Lens((^.))
-import Geodetics.Altitude
+import Control.Lens((^.), _Wrapped')
 import Geodetics.Ellipsoids
 import Geodetics.Geodetic
 import Geodetics.Grid
-import Geodetics.Latitude
-import Geodetics.Longitude
+import Geodetics.Types.Altitude
+import Geodetics.Types.Latitude
+import Geodetics.Types.Longitude
+import Geodetics.Types.TRF
 import Numeric.Units.Dimensional.Prelude
 import Prelude ()
 
@@ -53,10 +54,10 @@ mkGridStereo tangent origin scale = GridStereo {
    where 
       -- The reference seems to use χO to refer to two slightly different values. 
       -- Here these will be called LatC0 and LatC1.
-      ellipse = tangent ^. ellipsoid
+      ellipse = tangent ^. trf
       op :: Num a => Quantity d a -> Quantity d a    -- Values of longitude, tangent longitude, E and N
-      op = if tangent ^. latitudeL < _0 then negate else id  -- must be negated in the southern hemisphere.
-      lat0 = op $ (tangent ^. latitudeL)
+      op = if tangent ^. latitude . _Wrapped' < _0 then negate else id  -- must be negated in the southern hemisphere.
+      lat0 = op $ (tangent ^. latitude . _Wrapped')
       sinLat0 = sin lat0
       e2 = eccentricity2 ellipse
       e = sqrt e2
@@ -75,19 +76,19 @@ mkGridStereo tangent origin scale = GridStereo {
       
 
 instance GridClass GridStereo where
-   toGrid grid geo = applyOffset (gridOrigin grid) $ GridPoint east north (geo ^. altitude) grid
+   toGrid grid geo = applyOffset (gridOrigin grid) $ GridPoint east north (geo ^. altitude . _Wrapped') grid
       where
          op :: Num a => Quantity d a -> Quantity d a    -- Values of longitude, tangent longitude, E and N
-         op = if ((gridTangent grid) ^. latitudeL) < _0 then negate else id  -- must be negated in the southern hemisphere.
+         op = if ((gridTangent grid) ^. latitude . _Wrapped') < _0 then negate else id  -- must be negated in the southern hemisphere.
          sinLatC = (w - _1)/(w + _1)
          cosLatC = sqrt $ _1 - sinLatC * sinLatC
-         longC = gridN grid * (op (geo ^. longitudeL) - long0) + long0
+         longC = gridN grid * (op (geo ^. longitude . _Wrapped') - long0) + long0
          w = gridC grid * (sA * sB ** e) ** gridN grid
          sA = (_1+sinLat) / (_1 - sinLat)
          sB = (_1 - e*sinLat) / (_1 + e*sinLat)
-         sinLat = sin $ op $ (geo ^. latitudeL)
-         e = sqrt $ eccentricity2 $ (geo ^. ellipsoid)
-         long0 = op $ (gridTangent grid ^. longitudeL)
+         sinLat = sin $ op $ (geo ^. latitude . _Wrapped')
+         e = sqrt $ eccentricity2 $ (geo ^. trf)
+         long0 = op $ (gridTangent grid ^. longitude . _Wrapped')
          b = _1 + sinLatC * gridSin grid + cosLatC * gridCos grid * cos (longC - long0)
          east = _2 * gridR grid * gridScale grid * cosLatC * sin (longC - long0) / b
          north = _2 * gridR grid * gridScale grid * (sinLatC * gridCos grid - cosLatC * gridSin grid * cos (longC - long0)) / b
@@ -98,15 +99,15 @@ instance GridClass GridStereo where
          "\n   longC = " ++ show longC ++ "\n   long = " ++ show long ++
          "\n   latC = " ++ show latC ++
          "\n   lat1 = " ++ show lat1 ++ "\n   latN = " ++ show latN ) $ -}
-         Geodetic (op latN) (op long) height $ gridEllipsoid grid
+         Geodetic (Latitude (op latN)) (Longitude (op long)) (Altitude height) $ gridEllipsoid grid
       where
          op :: Num a => Quantity d a -> Quantity d a                   -- Values of longitude, tangent longitude, E and N
-         op = if (gridTangent grid ^. latitudeL) < _0 then negate else id  -- must be negated in the southern hemisphere.
+         op = if (gridTangent grid ^. latitude . _Wrapped') < _0 then negate else id  -- must be negated in the southern hemisphere.
          GridPoint east north height _ = applyOffset (offsetNegate $ gridOrigin grid) gp
          east' = east
          north' = north
          grid = gridBasis gp
-         long0 = op (gridTangent grid ^. longitudeL)
+         long0 = op (gridTangent grid ^. longitude . _Wrapped')
          i = atan2 east' (gridH grid + north')
          j = atan2 east' (gridG grid - north') - i
          latC = gridLatC grid + _2 * atan2 (north' - east' * tan (j/_2)) (_2 * gridR grid * gridScale grid)
@@ -121,4 +122,4 @@ instance GridClass GridStereo where
          lats = iterate next lat1
          latN = snd $ head $ dropWhile (\(v1, v2) -> abs (v1-v2) > 0.01 *~ arcsecond) $ zip lats $ tail lats 
             
-   gridEllipsoid = (^. ellipsoid) . gridTangent
+   gridEllipsoid = (^. trf) . gridTangent

@@ -2,6 +2,7 @@
 
 module Main where
 
+import Control.Lens((^.), _Wrapped')
 import Data.Maybe
 import Data.Monoid
 import Numeric.Units.Dimensional.Prelude
@@ -17,7 +18,6 @@ import Test.QuickCheck.Checkers (EqProp, eq, (=-=), unbatch)
 import Test.QuickCheck.Classes (monoid)
 
 import ArbitraryInstances
-import Geodetics.Altitude
 import Geodetics.Ellipsoids
 import Geodetics.Geodetic
 import Geodetics.Grid
@@ -25,6 +25,11 @@ import Geodetics.Path
 import Geodetics.Stereographic
 import Geodetics.TransverseMercator
 import Geodetics.UK
+import Geodetics.Types.Altitude
+import Geodetics.Types.Ellipsoid
+import Geodetics.Types.Latitude
+import Geodetics.Types.Longitude
+import Geodetics.Types.TRF
 
 
 main :: IO ()
@@ -108,7 +113,7 @@ sameAngle v1 v2 = abs (properAngle (v1 - v2)) < 0.01 *~ arcsecond
 
 -- | The grid positions are within 1mm
 sameGrid :: GridClass r => GridPoint r -> GridPoint r -> Bool
-sameGrid p1 p2 = check eastings && check northings && check altitude
+sameGrid p1 p2 = check eastings && check northings && check (^. altitude . _Wrapped')
    where check f = f p1 - f p2 < 1 *~ milli meter
 
 
@@ -120,7 +125,7 @@ sameOffset go1 go2 = check deltaNorth && check deltaEast && check deltaAltitude
 
 -- | The grid X and Y are both within 1 meter
 closeGrid :: GridClass r => GridPoint r -> GridPoint r -> Bool
-closeGrid p1 p2 = check eastings && check northings && check altitude
+closeGrid p1 p2 = check eastings && check northings && check (^. altitude . _Wrapped')
    where check f = f p1 - f p2 < 1 *~ meter
 
 -- | Degrees, minutes and seconds into radians. 
@@ -129,7 +134,7 @@ dms d m s = fromIntegral d *~ degree + fromIntegral m *~ arcminute + s *~ arcsec
 
 -- | Round-trip from local to WGS84 and back is identity (approximately)
 prop_WGS84_and_back :: Geodetic -> Bool
-prop_WGS84_and_back p = samePlace p $ toLocal (ellipsoid p) $ toWGS84 p
+prop_WGS84_and_back p = samePlace p $ toLocal ((^. trf) p) $ toWGS84 p
 
 
 -- | Sample pairs of points with bearings and distances. 
@@ -137,11 +142,11 @@ prop_WGS84_and_back p = samePlace p $ toLocal (ellipsoid p) $ toWGS84 p
 --  <http://www.ngs.noaa.gov/TOOLS/Inv_Fwd/Inv_Fwd.html>
 worldLines :: [(String, Geodetic, Geodetic, Length Double, Dimensionless Double, Dimensionless Double)]
 worldLines = [
-   ("Ordinary", Geodetic (40*~degree) (30*~degree) _0 _WGS84, Geodetic (30*~degree) (50*~degree) _0 _WGS84,
+   ("Ordinary", Geodetic (Latitude (40*~degree)) (Longitude (30*~degree)) (Altitude _0) _WGS84, Geodetic (Latitude (30*~degree)) (Longitude (50*~degree)) (Altitude _0) _WGS84,
       2128852.999*~meter, 115.19596706*~degree, 126.79044315*~degree),
-   ("Over Pole", Geodetic (60*~degree) (0*~degree) _0 _WGS84, Geodetic (60*~degree) (180*~degree) _0 _WGS84,
+   ("Over Pole", Geodetic (Latitude (60*~degree)) (Longitude (0*~degree)) (Altitude _0) _WGS84, Geodetic (Latitude (60*~degree)) (Longitude (180*~degree)) (Altitude _0) _WGS84,
       6695785.820*~meter, 0*~degree, 180*~degree),
-   ("Equator to Pole", Geodetic (0*~degree) (0*~degree) _0 _WGS84, Geodetic (90*~degree) (180*~degree) _0 _WGS84,
+   ("Equator to Pole", Geodetic (Latitude (0*~degree)) (Longitude (0*~degree)) (Altitude _0) _WGS84, Geodetic (Latitude (90*~degree)) (Longitude (180*~degree)) (Altitude _0) _WGS84,
       10001965.729*~meter, 0*~degree, 180*~degree)]
    
    
@@ -159,16 +164,16 @@ worldLineTests (str, g1, g2, d, a, b) = testCase str $ HU.assertBool "" $ ok $ g
 -- the same Helmert transform as this library. Hence the results should match to within 30 cm.
 ukPoints :: [(String, Geodetic, Geodetic)]
 ukPoints = [
-   ("Greenwich",        Geodetic (dms 51 28 40.86) (dms 0 0 (-5.83)) _0 _WGS84, 
-                        Geodetic (dms 51 28 39.00) (dms 0 0 0) _0 _OSGB36),
-   ("Edinburgh Castle", Geodetic (dms 55 56 56.30) (dms (-3) (-12) (-2.73)) _0 _WGS84, 
-                        Geodetic (dms 55 56 56.51) (dms (-3) (-11) (-57.61)) _0 _OSGB36),
-   ("Lands End",        Geodetic (dms 50 03 56.68) (dms (-5) (-42) (-51.20)) _0 _WGS84,
-                        Geodetic (dms 50 03 54.51) (dms (-5) (-42) (-47.87)) _0 _OSGB36),
-   ("Gt. Yarmouth Pier",Geodetic (dms 52 36 29.33) (dms 1 44 27.79) _0 _WGS84,
-                        Geodetic (dms 52 36 27.84) (dms 1 44 34.52) _0 _OSGB36),
-   ("Stanhope",         Geodetic (dms 54 44 49.08) (dms (-2) 0 (-19.89)) _0 _WGS84,
-                        Geodetic (dms 54 44 48.71) (dms (-2) 0 (-14.41)) _0 _OSGB36) ]
+   ("Greenwich",        Geodetic (Latitude (dms 51 28 40.86)) (Longitude (dms 0 0 (-5.83))) (Altitude _0) _WGS84, 
+                        Geodetic (Latitude (dms 51 28 39.00)) (Longitude (dms 0 0 0)) (Altitude _0) _OSGB36),
+   ("Edinburgh Castle", Geodetic (Latitude (dms 55 56 56.30)) (Longitude (dms (-3) (-12) (-2.73))) (Altitude _0) _WGS84, 
+                        Geodetic (Latitude (dms 55 56 56.51)) (Longitude (dms (-3) (-11) (-57.61))) (Altitude _0) _OSGB36),
+   ("Lands End",        Geodetic (Latitude (dms 50 03 56.68)) (Longitude (dms (-5) (-42) (-51.20))) (Altitude _0) _WGS84,
+                        Geodetic (Latitude (dms 50 03 54.51)) (Longitude (dms (-5) (-42) (-47.87))) (Altitude _0) _OSGB36),
+   ("Gt. Yarmouth Pier",Geodetic (Latitude (dms 52 36 29.33)) (Longitude (dms 1 44 27.79)) (Altitude _0) _WGS84,
+                        Geodetic (Latitude (dms 52 36 27.84)) (Longitude (dms 1 44 34.52)) (Altitude _0) _OSGB36),
+   ("Stanhope",         Geodetic (Latitude (dms 54 44 49.08)) (Longitude (dms (-2) 0 (-19.89))) (Altitude _0) _WGS84,
+                        Geodetic (Latitude (dms 54 44 48.71)) (Longitude (dms (-2) 0 (-14.41))) (Altitude _0) _OSGB36)]
 
 
 
@@ -223,7 +228,7 @@ ukSampleGrid = map convert [
    where
       convert (grid, x, y, lat, long, desc) = 
          (grid, GridPoint (x *~ meter) (y *~ meter) (0 *~ meter) UkNationalGrid,
-          Geodetic (lat *~ degree) (long *~ degree) (0 *~ meter) _WGS84, desc)
+          Geodetic (Latitude (lat *~ degree)) (Longitude (long *~ degree)) (Altitude (0 *~ meter)) _WGS84, desc)
 
 type GridPointTest = (String, GridPoint UkNationalGrid, Geodetic, String) -> Test
 
@@ -250,7 +255,7 @@ ukGridTest5 (_, gp, geo, testName) = testCase testName $ HU.assertBool ""
 
 -- | Worked example for UK Geodetic to GridPoint, taken from "A Guide to Coordinate Systems in Great Britain" [1]
 ukTest :: Geodetic
-ukTest = Geodetic (dms 52 39 27.2531) (dms 1 43 4.5177) (0 *~ meter) _OSGB36
+ukTest = Geodetic (Latitude (dms 52 39 27.2531)) (Longitude (dms 1 43 4.5177)) (Altitude (0 *~ meter)) _OSGB36
 
 {- 
    v = 6.3885023333E+06
@@ -273,8 +278,8 @@ ukTest = Geodetic (dms 52 39 27.2531) (dms 1 43 4.5177) (0 *~ meter) _OSGB36
 stereoGridN :: GridStereo
 stereoGridN = mkGridStereo tangent origin (0.9999079 *~ one)
    where
-      ellipse = Ellipsoid (6377397.155 *~ metre) (299.15281 *~ one) mempty
-      tangent = Geodetic (dms 52 9 22.178) (dms 5 23 15.500) (0 *~ meter) ellipse
+      ellipse = TRF (Ellipsoid (6377397.155 *~ metre) (299.15281 *~ one)) mempty 
+      tangent = Geodetic (Latitude (dms 52 9 22.178)) (Longitude (dms 5 23 15.500)) (Altitude (0 *~ meter)) ellipse
       origin = GridOffset (155000 *~ metre) (463000 *~ metre) (0 *~ meter)
       
       
@@ -284,8 +289,8 @@ stereoGridN = mkGridStereo tangent origin (0.9999079 *~ one)
 stereoGridS :: GridStereo
 stereoGridS = mkGridStereo tangent origin (0.9999079 *~ one)
    where
-      ellipse = Ellipsoid (6377397.155 *~ metre) (299.15281 *~ one) mempty
-      tangent = Geodetic (negate $ dms 52 9 22.178) (dms 5 23 15.500) (0 *~ meter) ellipse
+      ellipse = TRF (Ellipsoid (6377397.155 *~ metre) (299.15281 *~ one)) mempty
+      tangent = Geodetic (Latitude (negate $ dms 52 9 22.178)) (Longitude (dms 5 23 15.500)) (Altitude (0 *~ meter)) ellipse
       origin = GridOffset ((-155000) *~ metre) (463000 *~ metre) (0 *~ meter)
 
 
@@ -294,14 +299,14 @@ stereoGridS = mkGridStereo tangent origin (0.9999079 *~ one)
 stereographicToGridN :: Bool
 stereographicToGridN = sameGrid g1 g1'
    where
-      p1 = Geodetic (dms 53 0 0) (dms 6 0 0) (0 *~ meter) $ gridEllipsoid stereoGridN 
+      p1 = Geodetic (Latitude (dms 53 0 0)) (Longitude (dms 6 0 0)) (Altitude (0 *~ meter)) $ gridEllipsoid stereoGridN 
       g1 = GridPoint (196105.283 *~ meter) (557057.739 *~ meter) (0 *~ meter) stereoGridN
       g1' = toGrid stereoGridN p1
 
 stereographicFromGridN :: Bool
 stereographicFromGridN = samePlace p1 p1'
    where
-      p1 = Geodetic (dms 53 0 0) (dms 6 0 0) (0 *~ meter) $ gridEllipsoid stereoGridN
+      p1 = Geodetic (Latitude (dms 53 0 0)) (Longitude (dms 6 0 0)) (Altitude (0 *~ meter)) $ gridEllipsoid stereoGridN
       g1 = GridPoint (196105.283 *~ meter) (557057.739 *~ meter) (0 *~ meter) stereoGridN
       p1' = fromGrid g1      
 
@@ -309,7 +314,7 @@ stereographicFromGridN = samePlace p1 p1'
 stereographicToGridS :: Bool
 stereographicToGridS = sameGrid g1 g1'
    where
-      p1 = Geodetic (negate $ dms 53 0 0) (dms 6 0 0) (0 *~ meter) $ gridEllipsoid stereoGridS
+      p1 = Geodetic (Latitude (negate $ dms 53 0 0)) (Longitude (dms 6 0 0)) (Altitude (0 *~ meter)) $ gridEllipsoid stereoGridS
       g1 = GridPoint ((-196105.283) *~ meter) (557057.739 *~ meter) (0 *~ meter) stereoGridS
       g1' = toGrid stereoGridS p1
 
@@ -317,7 +322,7 @@ stereographicToGridS = sameGrid g1 g1'
 stereographicFromGridS :: Bool
 stereographicFromGridS = samePlace p1 p1'
    where
-      p1 = Geodetic (negate $ dms 53 0 0) (dms 6 0 0) (0 *~ meter) $ gridEllipsoid stereoGridS
+      p1 = Geodetic (Latitude (negate $ dms 53 0 0)) (Longitude (dms 6 0 0)) (Altitude (0 *~ meter)) $ gridEllipsoid stereoGridS
       g1 = GridPoint ((-196105.283) *~ meter) (557057.739 *~ meter) (0 *~ meter) stereoGridS
       p1' = fromGrid g1 
 
@@ -383,12 +388,12 @@ prop_rayContinuity = prop_pathContinuity rayPath
 -- | A ray bisected to an altitude will give that altitude.
 -- This is a test of bisection rather than rays.
 prop_rayBisect :: Ray -> Altitude -> Bool
-prop_rayBisect r (Altitude height) = 
+prop_rayBisect r (Altitude height) =
    case bisect ray0 f (1 *~ centi meter) (0 *~ meter) (1000 *~ kilo meter) of
       Nothing -> False
-      Just d -> let (g, _, _) = pathFunc ray0 d in abs (altitude g - height) < 1 *~ centi meter
+      Just d -> let (g, _, _) = pathFunc ray0 d in abs ((^. altitude . _Wrapped') g - height) < 1 *~ centi meter
    where
-      f g = compare (altitude g) height
+      f g = compare ((^. altitude . _Wrapped') g) height
       ray0 = getRay r
    
 

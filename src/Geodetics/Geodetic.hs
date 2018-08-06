@@ -19,16 +19,18 @@ module Geodetics.Geodetic (
    _WGS84
 ) where
 
-import Control.Lens(Lens', (^.))
+import Control.Lens(Lens', (^.), _Wrapped')
 import Data.Char (chr)
 import Data.Function((.))
 import Data.Maybe
 import Data.Monoid
-import Geodetics.Altitude
-import Geodetics.Latitude
-import Geodetics.Longitude
 import Geodetics.Ellipsoids
 import Geodetics.LatLongParser
+import Geodetics.Types.Altitude
+import Geodetics.Types.Latitude
+import Geodetics.Types.Longitude
+import Geodetics.Types.Ellipsoid
+import Geodetics.Types.TRF
 import Linear.V3(V3(V3))
 import Numeric.Units.Dimensional.Prelude hiding ((.))
 import Text.ParserCombinators.ReadP
@@ -65,10 +67,10 @@ import qualified Prelude as P
 -- (or its squared variant to avoid an extra @sqrt@ operation).
 data Geodetic =
   Geodetic
-     (Angle Double)
-     (Angle Double)
-     (Length Double)
-     Ellipsoid
+     Latitude
+     Longitude
+     Altitude
+     TRF
 
 class HasGeodetic a where
    geodetic ::
@@ -78,16 +80,52 @@ instance HasGeodetic Geodetic where
    geodetic =
       id
 
+instance ManyTRF Geodetic where
+  _ManyTRF =
+    trf
+
+instance FoldTRF Geodetic where
+  _FoldTRF =
+    trf
+
+instance GetTRF Geodetic where
+  _GetTRF =
+    trf
+
+instance SetTRF Geodetic where
+  _SetTRF =
+    trf
+
 instance HasEllipsoid Geodetic where
-   ellipsoid k (Geodetic lat' lon' alt' e) =
+  ellipsoid =
+    trf . ellipsoid
+
+instance GetEllipsoid Geodetic where
+  _GetEllipsoid =
+    ellipsoid
+
+instance ManyEllipsoid Geodetic where
+  _ManyEllipsoid =
+    ellipsoid
+
+instance FoldEllipsoid Geodetic where
+  _FoldEllipsoid =
+    ellipsoid
+
+instance SetEllipsoid Geodetic where
+  _SetEllipsoid =
+    ellipsoid
+
+instance HasTRF Geodetic where
+   trf k (Geodetic lat' lon' alt' e) =
       fmap (\x -> Geodetic lat' lon' alt' x) (k e)
 
 instance HasLatitude Geodetic where
-   latitudeL k (Geodetic lat' lon' alt' e) =
+   latitude k (Geodetic lat' lon' alt' e) =
       fmap (\x -> Geodetic x lon' alt' e) (k lat')
 
 instance HasLongitude Geodetic where
-  longitudeL k (Geodetic lat' lon' alt' e) =
+   longitude k (Geodetic lat' lon' alt' e) =
       fmap (\x -> Geodetic lat' x alt' e) (k lon')
 
 instance HasAltitude Geodetic where
@@ -96,9 +134,9 @@ instance HasAltitude Geodetic where
 
 instance Show Geodetic where
    show g = concat [
-      showAngle (abs $ (g ^. latitudeL)),  " ", letter "SN" (g ^. latitudeL),  ", ",
-      showAngle (abs $ (g ^. longitudeL)), " ", letter "WE" (g ^. longitudeL), ", ", 
-      show (g ^. altitude), " ", show (g ^. ellipsoid)]
+      showAngle (abs $ (g ^. latitude . _Wrapped')),  " ", letter "SN" (g ^. latitude . _Wrapped'),  ", ",
+      showAngle (abs $ (g ^. longitude . _Wrapped')), " ", letter "WE" (g ^. longitude . _Wrapped'), ", ", 
+      show (g ^. altitude), " ", show (g ^. trf)]
       where letter s n = [s !! (if n < _0 then 0 else 1)]
 
 
@@ -119,11 +157,11 @@ instance Show Geodetic where
 -- * Degrees, minutes and seconds (units optional): 34° 31' 23.52\" N, 46° 13' 56.43\" W 
 -- 
 -- * DDDMMSS format with optional leading zeros: 343123.52N, 0461356.43W
-readGroundPosition :: Ellipsoid -> String -> Maybe Geodetic
+readGroundPosition :: TRF -> String -> Maybe Geodetic
 readGroundPosition e str = 
    case map fst $ filter (null . snd) $ readP_to_S latLong str of
       [] -> Nothing
-      (lat,long) : _ -> Just $ groundPosition $ Geodetic (lat *~ degree) (long *~ degree) undefined e
+      (lat,long) : _ -> Just $ groundPosition $ Geodetic (Latitude (lat *~ degree)) (Longitude (long *~ degree)) undefined e
       
       
 -- | Show an angle as degrees, minutes and seconds to two decimal places.
@@ -147,12 +185,12 @@ showAngle a
 -- | The point on the Earth diametrically opposite the argument, with
 -- the same altitude.
 antipode :: Geodetic -> Geodetic
-antipode g = Geodetic lat long (g ^. altitude) (g ^. ellipsoid)
+antipode g = Geodetic lat long (g ^. altitude) (g ^. trf)
    where
-      lat = negate $ (g ^. latitudeL)
-      long' = (g ^. longitudeL) - 180 *~ degree
-      long | long' < _0  = long' + 360 *~ degree
-           | otherwise  = long' 
+      lat = Latitude (negate $ (g ^. latitude . _Wrapped'))
+      long' = (g ^. longitude . _Wrapped') - 180 *~ degree
+      long | long' < _0  = Longitude (long' + 360 *~ degree)
+           | otherwise  = Longitude long' 
 
    
    
@@ -164,15 +202,15 @@ geoToEarth geo = V3 (
       ((n + h) * coslat * sinlong)
       ((n * (_1 - eccentricity2 e) + h) * sinlat)
    where 
-      geolat = geo ^. latitudeL
-      geolon = geo ^. longitudeL
+      geolat = geo ^. latitude . _Wrapped'
+      geolon = geo ^. longitude . _Wrapped'
       n = normal e $ geolat
-      e = geo ^. ellipsoid
+      e = geo ^. trf
       coslat = cos $ geolat
       coslong = cos $ geolon
       sinlat = sin $ geolat
       sinlong = sin $ geolon
-      h = geo ^. altitude
+      h = geo ^. altitude . _Wrapped'
 
 
 -- | Convert an earth centred coordinate into a geodetic coordinate on 
@@ -181,12 +219,12 @@ geoToEarth geo = V3 (
 -- Uses the closed form solution of H. Vermeille: Direct
 -- transformation from geocentric coordinates to geodetic coordinates.
 -- Journal of Geodesy Volume 76, Number 8 (2002), 451-454
-earthToGeo :: Ellipsoid -> ECEF -> (Angle Double, Angle Double, Length Double)
+earthToGeo :: TRF -> ECEF -> (Angle Double, Angle Double, Length Double)
 earthToGeo e (V3 x y z) = (phi, atan2 y x, sqrt (l ^ pos2 + p2) - norm)
    where
       -- Naming: numeric suffix inicates power. Hence x2 = x * x, x3 = x2 * x, etc.
       p2 = x ^ pos2 + y ^ pos2
-      a = majorRadius e
+      a = (^. majorRadius) e
       a2 = a ^ pos2
       e2 = eccentricity2 e
       e4 = e2 ^ pos2
@@ -206,21 +244,21 @@ earthToGeo e (V3 x y z) = (phi, atan2 y x, sqrt (l ^ pos2 + p2) - norm)
 
 
 -- | Convert a position from any geodetic to another one, assuming local altitude stays constant.
-toLocal :: Ellipsoid -> Geodetic -> Geodetic
-toLocal e2 g = Geodetic lat lon alt e2
+toLocal :: TRF -> Geodetic -> Geodetic
+toLocal e2 g = Geodetic (Latitude lat) (Longitude lon) alt e2
    where
       alt = g ^. altitude
       (lat, lon, _) = earthToGeo e2 $ applyHelmert h $ geoToEarth g
-      h = helmert (g ^. ellipsoid) `mappend` inverseHelmert (helmert e2)
+      h = (^. helmert) (g ^. trf) `mappend` inverseHelmert ((^. helmert) e2)
 
 -- | Convert a position from any geodetic to WGS84, assuming local
 -- altitude stays constant.
 toWGS84 :: Geodetic -> Geodetic
-toWGS84 g = Geodetic lat lon alt _WGS84
+toWGS84 g = Geodetic (Latitude lat) (Longitude lon) alt _WGS84
    where
       alt = g ^. altitude
       (lat, lon, _) = earthToGeo _WGS84 $ applyHelmert h $ geoToEarth g
-      h = helmert (g ^. ellipsoid)
+      h = (^. helmert) (g ^. trf)
 
 
 -- | The absolute distance in a straight line between two geodetic 
@@ -275,13 +313,13 @@ groundDistance p1 p2 = do
        alpha2 = atan2(cosU1 * sin lambda) (cosU1 * sinU2 * cos lambda - sinU1 * cosU2)
      return (s, alpha1, alpha2)
   where
-    p1ellipsoid = p1 ^. ellipsoid
+    p1ellipsoid = p1 ^. trf
     f = flattening p1ellipsoid
-    a = majorRadius p1ellipsoid
+    a = (^. majorRadius) p1ellipsoid
     b = minorRadius p1ellipsoid
-    l = abs $ (p1 ^. longitudeL) - (p2 ^. longitudeL)
-    u1 = atan ((_1-f) * tan (p1 ^. latitudeL))
-    u2 = atan ((_1-f) * tan (p2 ^. latitudeL))
+    l = abs $ (p1 ^. longitude . _Wrapped') - (p2 ^. longitude . _Wrapped')
+    u1 = atan ((_1-f) * tan (p1 ^. latitude . _Wrapped'))
+    u2 = atan ((_1-f) * tan (p2 ^. latitude . _Wrapped'))
     sinU1 = sin u1
     cosU1 = cos u1
     sinU2 = sin u2

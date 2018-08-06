@@ -5,14 +5,17 @@ module Geodetics.TransverseMercator(
    mkGridTM
 ) where
 
-import Control.Lens((^.))
+import Control.Lens((^.), _Wrapped')
 import Data.Function
 import Data.Monoid
 import Geodetics.Ellipsoids
 import Geodetics.Geodetic
 import Geodetics.Grid
-import Geodetics.Latitude
-import Geodetics.Longitude
+import Geodetics.Types.Altitude
+import Geodetics.Types.Latitude
+import Geodetics.Types.Longitude
+import Geodetics.Types.Ellipsoid
+import Geodetics.Types.TRF
 import Numeric.Units.Dimensional.Prelude hiding ((.))
 import Prelude ()
 
@@ -50,7 +53,7 @@ mkGridTM origin offset sf =
            gridN4 = ((35*~one)/(24*~one)) * n^pos3
         }
     where 
-       f = flattening (origin ^. ellipsoid)
+       f = flattening (origin ^. trf)
        n = f / (_2-f)  -- Equivalent to (a-b)/(a+b) where b = (1-f)*a
 
 
@@ -63,32 +66,32 @@ m grid lat = bF0 * (gridN1 grid * dLat
                     + gridN3 grid * sin (_2 * dLat) * cos (_2 * sLat) 
                     - gridN4 grid * sin (_3 * dLat) * cos (_3 * sLat))
    where
-      dLat = lat - (trueOrigin grid ^. latitudeL)
-      sLat = lat + (trueOrigin grid ^. latitudeL)
+      dLat = lat - (trueOrigin grid ^. latitude . _Wrapped')
+      sLat = lat + (trueOrigin grid ^. latitude . _Wrapped')
       bF0 = minorRadius (gridEllipsoid grid) * gridScale grid
 
 
 instance GridClass GridTM where
    fromGrid p = Geodetic
-      (lat' - east' ^ pos2 * tanLat / (_2 * rho * v)  -- Term VII
+      (Latitude (lat' - east' ^ pos2 * tanLat / (_2 * rho * v)  -- Term VII
             + east' ^ pos4 * (tanLat / ((24 *~ one) * rho * v ^ pos3)) 
                            * (_5 + _3 * tanLat ^ pos2 + eta2 - _9 * tanLat ^ pos2 * eta2)  -- Term VIII
             - east' * east' ^ pos5 * (tanLat / ((720 *~ one) * rho * v ^ pos5))
-                           * (61 *~ one + (90 *~ one) * tanLat ^ pos2 + (45 *~ one) * tanLat ^ pos4)) -- Term IX
-      ((trueOrigin grid ^. longitudeL) 
+                           * (61 *~ one + (90 *~ one) * tanLat ^ pos2 + (45 *~ one) * tanLat ^ pos4))) -- Term IX
+      (Longitude ((trueOrigin grid ^. longitude . _Wrapped') 
             + east' / (cosLat * v)  -- Term X
             - (east' ^ pos3 / (_6 * cosLat * v ^ pos3)) * (v / rho + _2 * tanLat ^ pos2)  -- Term XI
             + (east' ^ pos5 / ((120 *~ one) * cosLat * v ^ pos5)) 
                  * (_5 + (28 *~ one) * tanLat ^ pos2  + (24 *~ one) * tanLat ^ pos4)  -- Term XII
             - (east' ^ pos5 * east' ^ pos2 / ((5040 *~ one) * cosLat * v * v * v ^ pos5))
-                 * ((61 *~ one) + (662 *~ one) * tanLat ^ pos2 + (1320 *~ one) * tanLat ^ pos4 + (720 *~ one) * tanLat * tanLat ^ pos5)) -- Term XIIa
-     (0 *~ meter) (gridEllipsoid grid)
+                 * ((61 *~ one) + (662 *~ one) * tanLat ^ pos2 + (1320 *~ one) * tanLat ^ pos4 + (720 *~ one) * tanLat * tanLat ^ pos5))) -- Term XIIa
+     (Altitude (0 *~ meter)) (gridEllipsoid grid)
             
             
       where
          GridPoint east' north' _ _ = falseOrigin grid `applyOffset` p
          lat' = fst $ head $ dropWhile ((> 0.01 *~ milli meter) . snd) 
-               $ tail $ iterate next (trueOrigin grid ^. latitudeL, 1 *~ meter) 
+               $ tail $ iterate next (trueOrigin grid ^. latitude . _Wrapped', 1 *~ meter) 
             where
                next (phi, _) = let delta = north' - m grid phi in (phi + delta / aF0, delta) 
                -- head and tail are safe because iterate returns an infinite list.
@@ -102,7 +105,7 @@ instance GridClass GridTM where
          eta2 = v / rho - _1
                
                
-         aF0 = majorRadius (gridEllipsoid grid) * gridScale grid
+         aF0 = (^. majorRadius) (gridEllipsoid grid) * gridScale grid
          e2 = eccentricity2 $ gridEllipsoid grid
          grid = gridBasis p
          
@@ -148,14 +151,14 @@ instance GridClass GridTM where
             "VI   = ", show term_VI, "\n"]
          -}
          -- Common subexpressions
-         lat = geo ^. latitudeL
-         long = geo ^. longitudeL
-         dLong = long - (trueOrigin grid ^. longitudeL)
+         lat = geo ^. latitude . _Wrapped'
+         long = geo ^. longitude . _Wrapped'
+         dLong = long - (trueOrigin grid ^. longitude . _Wrapped')
          sinLat = sin lat
          cosLat = cos lat
          tanLat = tan lat
          sinLat2 = sinLat ^ pos2
-         aF0 = (majorRadius $ gridEllipsoid grid) * gridScale grid
+         aF0 = ((^. majorRadius) $ gridEllipsoid grid) * gridScale grid
          e2 = eccentricity2 $ gridEllipsoid grid
          
-   gridEllipsoid = (^. ellipsoid) . trueOrigin
+   gridEllipsoid = (^. trf) . trueOrigin
